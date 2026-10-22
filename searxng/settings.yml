@@ -1,5 +1,10 @@
 # Minimal SearXNG config for Scout: defaults plus the JSON output format.
-use_default_settings: true
+use_default_settings:
+  engines:
+    # Encyclopedias never hold the threads Scout looks for, and they rate-limit fast.
+    remove:
+      - wikipedia
+      - wikidata
 
 server:
   # Overridden by SEARXNG_SECRET in docker-compose.yml.

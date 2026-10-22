@@ -4,14 +4,15 @@ import { describe, expect, it, vi } from "vitest";
 import { SOURCE_USER_AGENT } from "@/lib/config";
 import { parseLooseDate } from "@/lib/sources/dates";
 import { HackerNewsSource, mapHackerNewsResponse } from "@/lib/sources/hackernews";
-import { mapRedditResponse, RedditSource } from "@/lib/sources/reddit";
+import { mapRedditResponse, mapRedditRss, RedditSource } from "@/lib/sources/reddit";
 import { mapSearxngResponse } from "@/lib/sources/searxng";
 import { mapSerpApiResponse } from "@/lib/sources/serpapi";
 import { SourceBlockedError, SourceError } from "@/lib/sources/types";
 import { venueFromUrl } from "@/lib/sources/venue";
 
-const fixture = (name: string): unknown =>
-  JSON.parse(readFileSync(path.join(import.meta.dirname, "../fixtures/sources", name), "utf8"));
+const fixtureText = (name: string): string =>
+  readFileSync(path.join(import.meta.dirname, "../fixtures/sources", name), "utf8");
+const fixture = (name: string): unknown => JSON.parse(fixtureText(name));
 const NOW = Date.parse("2026-10-21T12:00:00Z");
 
 describe("reddit mapping", () => {
@@ -38,6 +39,32 @@ describe("reddit mapping", () => {
 
   it("rejects an unexpected shape", () => {
     expect(() => mapRedditResponse({ nope: true })).toThrow(SourceError);
+  });
+});
+
+describe("reddit RSS mapping", () => {
+  const hits = mapRedditRss(fixtureText("reddit.rss.xml"));
+
+  it("keeps posts and skips subreddit entries", () => {
+    expect(hits).toHaveLength(2);
+    expect(hits.every((h) => h.url.includes("/comments/"))).toBe(true);
+  });
+
+  it("maps link, author, date, subreddit venue, and decoded text", () => {
+    expect(hits[0]).toMatchObject({
+      source: "reddit",
+      url: "https://www.reddit.com/r/DesignMyRoom/comments/1xc340k/redecor/",
+      title: "Redecor",
+      author: "Artistic_Income_7051",
+      postedAt: "2026-10-21T23:41:41.000Z",
+      venueName: "r/DesignMyRoom",
+    });
+    expect(hits[0].snippet).toMatch(/^Hello, I'm 18/);
+    expect(hits[0].snippet).not.toMatch(/<|&#39;|SC_OFF/);
+  });
+
+  it("rejects a non-feed body", () => {
+    expect(() => mapRedditRss("<html></html>")).toThrow(SourceError);
   });
 });
 
@@ -115,11 +142,19 @@ describe("adapter transport", () => {
     expect((init.headers as Record<string, string>)["User-Agent"]).toBe(SOURCE_USER_AGENT);
   });
 
-  it("throws SourceBlockedError on 403/429", async () => {
-    const fetch = vi.fn(async () => new Response("blocked", { status: 403 }));
-    await expect(new RedditSource({ fetch: fetch as typeof globalThis.fetch }).search("x")).rejects.toBeInstanceOf(
-      SourceBlockedError,
+  it("reddit falls back to RSS after a 403, and throws SourceBlockedError when both refuse", async () => {
+    const rss = fixtureText("reddit.rss.xml");
+    const fetch = vi.fn(async (url: string) =>
+      url.includes("search.json") ? new Response("blocked", { status: 403 }) : new Response(rss),
     );
+    const reddit = new RedditSource({
+      fetch: fetch as unknown as typeof globalThis.fetch,
+      sleep: async () => undefined,
+    });
+    await expect(reddit.search("x")).resolves.toHaveLength(2);
+
+    fetch.mockImplementation(async () => new Response("slow down", { status: 429 }));
+    await expect(reddit.search("y")).rejects.toBeInstanceOf(SourceBlockedError);
   });
 });
 

@@ -29,6 +29,7 @@ export function matchScores(batch: Hit[], scores: HitScore[]): ScoredHit[] {
     if (!score) continue;
     out.push({
       ...hit,
+      authorType: score.author_type,
       relevance: score.relevance,
       intent: score.intent,
       reason: score.reason.slice(0, SCOUT.reasonChars),

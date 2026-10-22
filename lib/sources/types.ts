@@ -3,6 +3,8 @@ import type { Hit, HitSource } from "@/types/domain";
 export interface SearchOptions {
   /** ISO 639-1 code from the query plan ("en", "es"). Sources that can't filter ignore it. */
   lang?: string;
+  /** Restrict to one site (e.g. "reddit.com"). Only SerpApi supports it. */
+  site?: string;
 }
 
 export interface SourceAdapter {
@@ -14,6 +16,8 @@ export interface SourceAdapter {
 export interface AdapterDeps {
   fetch?: typeof fetch;
   now?: () => number;
+  /** Used by rate limiters; tests pass a no-op. */
+  sleep?: (ms: number) => Promise<void>;
 }
 
 /** Non-2xx response, timeout, network failure, or unexpected body. */

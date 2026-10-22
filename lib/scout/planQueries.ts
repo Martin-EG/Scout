@@ -46,7 +46,12 @@ export async function planQueries(
     const plan = await llm.completeJSON(
       planQueriesPrompt(project, { minQueries: SCOUT.minQueries, maxQueries: SCOUT.maxQueries }),
       queryPlanSchema,
-      { model, system: PLAN_QUERIES_SYSTEM, temperature: SCOUT.plannerTemperature },
+      {
+        model,
+        system: PLAN_QUERIES_SYSTEM,
+        temperature: SCOUT.plannerTemperature,
+        timeoutMs: SCOUT.plannerTimeoutMs,
+      },
     );
     const queries = cleanQueries(plan.queries);
     if (queries.length < SCOUT.minQueries) {

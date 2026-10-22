@@ -23,6 +23,7 @@ ${formatProjectProfile(project)}
 
 Score each post below.
 
+author_type: "person" if an individual wrote it about their own life (a question, a complaint, a story, a forum reply); "publisher" if a company, brand, store, app, blog, magazine, or media outlet wrote it.
 relevance (0-10): how closely the post is about the problems this app solves, for its audience.
 intent (0-10): how likely the author would welcome a recommendation for a tool like this right now.
   10 = explicitly asks for an app, tool, or recommendation for this exact problem
@@ -36,5 +37,5 @@ Posts:
 ${hits.map((hit, i) => formatHit(hit, i, opts.snippetChars)).join("\n\n")}
 
 Reply with only this JSON shape, one entry per post, copying each url exactly:
-{"results": [{"url": "...", "relevance": 0, "intent": 0, "reason": "..."}]}`;
+{"results": [{"url": "...", "author_type": "person", "relevance": 0, "intent": 0, "reason": "..."}]}`;
 }

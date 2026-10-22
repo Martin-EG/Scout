@@ -16,6 +16,7 @@ export const DEFAULT_THRESHOLDS: ScoreThresholds = {
 };
 
 export interface ScoredHit extends Hit {
+  authorType: "person" | "publisher";
   relevance: number;
   intent: number;
   reason: string;
@@ -28,9 +29,17 @@ export function isTooOld(hit: Pick<Hit, "postedAt">, now: number, maxAgeDays: nu
   return !Number.isNaN(posted) && now - posted > maxAgeDays * DAY_MS;
 }
 
-/** Keep a scored hit only if it is recent enough, relevant enough, and shows enough intent. */
+/**
+ * Keep a scored hit only if a person wrote it (not a brand, blog, or store), it is
+ * recent enough, relevant enough, and shows enough intent.
+ */
 export function passesScoreRules(hit: ScoredHit, now: number, t: ScoreThresholds = DEFAULT_THRESHOLDS): boolean {
-  return !isTooOld(hit, now, t.maxAgeDays) && hit.relevance >= t.minRelevance && hit.intent >= t.minIntent;
+  return (
+    hit.authorType === "person" &&
+    !isTooOld(hit, now, t.maxAgeDays) &&
+    hit.relevance >= t.minRelevance &&
+    hit.intent >= t.minIntent
+  );
 }
 
 /** Kept leads, best first: intent, then relevance. */

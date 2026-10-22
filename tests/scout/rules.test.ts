@@ -7,6 +7,7 @@ import {
   selectHitsToScore,
   type ScoredHit,
 } from "@/lib/scout/rules";
+import { scoreBatchSchema } from "@/lib/llm/schemas/score";
 import { matchScores, chunk } from "@/lib/scout/score";
 import type { Hit } from "@/types/domain";
 
@@ -24,6 +25,7 @@ const base: Hit = {
 };
 const scored = (over: Partial<ScoredHit>): ScoredHit => ({
   ...base,
+  authorType: "person",
   relevance: 8,
   intent: 8,
   reason: "r",
@@ -34,6 +36,10 @@ const scored = (over: Partial<ScoredHit>): ScoredHit => ({
 describe("score rules", () => {
   it("keeps hits at exactly the thresholds", () => {
     expect(passesScoreRules(scored({ relevance: 6, intent: 5 }), NOW, T)).toBe(true);
+  });
+
+  it("drops pages written by publishers", () => {
+    expect(passesScoreRules(scored({ authorType: "publisher" }), NOW, T)).toBe(false);
   });
 
   it("drops low relevance or low intent", () => {
@@ -80,11 +86,29 @@ describe("matchScores", () => {
   it("pairs scores to hits by normalized url and ignores unknown urls", () => {
     const batch = [base, { ...base, url: "https://example.com/b" }];
     const out = matchScores(batch, [
-      { url: "https://old.reddit.com/r/x/comments/1/t/", relevance: 7, intent: 6, reason: "asks for an app" },
-      { url: "https://made-up.example/", relevance: 9, intent: 9, reason: "hallucinated" },
+      {
+        url: "https://old.reddit.com/r/x/comments/1/t/",
+        author_type: "person",
+        relevance: 7,
+        intent: 6,
+        reason: "asks for an app",
+      },
+      { url: "https://made-up.example/", author_type: "person", relevance: 9, intent: 9, reason: "hallucinated" },
     ]);
     expect(out).toHaveLength(1);
-    expect(out[0]).toMatchObject({ url: base.url, relevance: 7, intent: 6, reason: "asks for an app" });
+    expect(out[0]).toMatchObject({ url: base.url, authorType: "person", relevance: 7, intent: 6 });
+  });
+
+  it("reads unknown author types as publisher", () => {
+    const parsed = scoreBatchSchema.parse({
+      results: [
+        { url: "a", author_type: "Person", relevance: "7", intent: 6 },
+        { url: "b", author_type: "brand", relevance: 7, intent: 6 },
+        { url: "c", relevance: 7, intent: 6 },
+      ],
+    });
+    expect(parsed.results.map((r) => r.author_type)).toEqual(["person", "publisher", "publisher"]);
+    expect(parsed.results[0].relevance).toBe(7);
   });
 
   it("chunks into batches", () => {

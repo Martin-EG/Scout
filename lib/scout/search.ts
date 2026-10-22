@@ -16,7 +16,7 @@ export interface SearchResult {
   queries: QueryResult[];
 }
 
-const REDDIT_SITE = "site:reddit.com";
+const REDDIT_SITE = "reddit.com";
 
 async function runOne(
   adapter: SourceAdapter,
@@ -24,10 +24,11 @@ async function runOne(
   query: QueryResult,
   hits: Hit[],
   ctx: LogContext,
+  site?: string,
 ): Promise<void> {
   query.ranOn.push(adapter.source);
   try {
-    const found = await adapter.search(text, { lang: query.lang });
+    const found = await adapter.search(text, { lang: query.lang, site });
     query.hits += found.length;
     hits.push(...found);
   } catch (err) {
@@ -37,7 +38,7 @@ async function runOne(
   }
 }
 
-/** Reddit lane. After the first 403/429, remaining queries go to SerpApi as site:reddit.com. */
+/** Reddit lane. After the first 403/429, remaining queries go to SerpApi restricted to reddit.com. */
 async function redditLane(queries: QueryResult[], sources: Sources, hits: Hit[], ctx: LogContext) {
   let blocked = false;
   for (const query of queries) {
@@ -52,7 +53,7 @@ async function redditLane(queries: QueryResult[], sources: Sources, hits: Hit[],
       }
     }
     if (sources.serpapi) {
-      await runOne(sources.serpapi, `${REDDIT_SITE} ${query.text}`, query, hits, ctx).catch(() => undefined);
+      await runOne(sources.serpapi, query.text, query, hits, ctx, REDDIT_SITE).catch(() => undefined);
     }
   }
 }

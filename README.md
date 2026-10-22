@@ -33,14 +33,17 @@ What works today:
      English and Spanish, each tagged `reddit`, `hn`, or `web` (falls back to the project's
      keywords if the model fails).
    - **search**: Reddit, Hacker News (Algolia), SearXNG, and SerpApi (Google, past month).
-     Each source has a timeout, a User-Agent, and its own rate limit. If Reddit answers
-     403/429, the remaining Reddit queries run on SerpApi as `site:reddit.com`. SerpApi is
-     skipped when `SERPAPI_KEY` is unset.
+     Each source has a timeout, a User-Agent, and its own rate limit. Reddit tries
+     `search.json`; on 403 it switches to `search.rss` (1 request/minute, 5 per run); after
+     that, Reddit queries run on SerpApi restricted to reddit.com (no time filter, because
+     Google ignores the site restriction with one). SerpApi is skipped when `SERPAPI_KEY`
+     is unset.
    - **dedupe**: URLs normalized (tracking params, fragments, trailing slashes, reddit
      hosts) and dropped if already a lead for the project (dismissed ones included).
      App-store listings and the project's own site are dropped; hits older than 30 days too.
-   - **score**: `SCORER_MODEL` (gemma3:4b) scores batches of 5 hits for relevance and
-     intent (0-10) with a reason. Kept if relevance ≥ 6 and intent ≥ 5. Venues are upserted
+   - **score**: `SCORER_MODEL` (gemma3:4b) scores batches of 5 hits: author type
+     (person or publisher), relevance and intent (0-10), and a reason. Kept if a person
+     wrote it, relevance ≥ 6, and intent ≥ 5. Venues are upserted
      (subreddit, Hacker News, or domain) and leads inserted.
    - The run row gets `queries` (each with where it ran, hit count, errors), `hits_found`,
      `leads_kept`, `step_durations`, and `done` or `failed` with the error.
@@ -185,22 +188,29 @@ Built:
   unique `venues(project_id, platform, name)`.
 - UI: Run now + live runs table (`components/runs/*`), quota and one-active-run checks
   (`lib/db/runs.ts`), temporary leads page with Dismiss (`app/projects/[id]/leads`).
-- Tests: 47 passing. URL normalization + dedupe, score rules, skip domains, query plan
+- Tests: 52 passing. URL normalization + dedupe, score rules, skip domains, query plan
   schema, rate limiter, and each adapter's mapping from fixture JSON in
-  `tests/fixtures/sources/` (HN, SearXNG, SerpApi captured live and trimmed; Reddit
-  hand-built in the documented Listing shape because Reddit returned 403 here).
+  `tests/fixtures/sources/` (HN, SearXNG, SerpApi, Reddit RSS captured live and trimmed;
+  Reddit JSON hand-built in the documented Listing shape because Reddit returned 403 here).
 
-Measured:
-- Planner (gemma3:12b): 19 queries, 12 EN / 7 ES, 78 s. Scorer (gemma3:4b): batch of 4 in
-  18 s (includes model load).
+Live GlamVault runs (after the migration was applied):
+- Run 1: the planner timed out at 120 s (cold gemma3:12b load) and fell back to keyword
+  queries; all 8 SearXNG queries timed out (upstream engines throttling); SerpApi's
+  `site:reddit.com` with the past-month filter returned non-Reddit pages. 68 hits, 11
+  leads, 9 m 25 s. 10 of 11 leads were brand blogs or videos.
+- Fixes: planner timeout 300 s; Reddit `search.rss` fallback; SerpApi site searches via
+  `as_sitesearch` without `tbs`, `hl=en` so dates parse; SearXNG without Wikipedia and
+  Wikidata, 4 s between calls; scorer reports `author_type`, publishers dropped.
+- Run 2: 19 LLM queries (57 s), 288 hits, 278 unique, 150 scored (cap), 12 leads kept.
+  plan 57 s, search 4 m 07 s, score 8 m 11 s, total 13 m 17 s. 0 failed batches.
 
 Known issues:
-- No full live run yet: the day-2 migration was not applied to the Supabase project when
-  this was written. One GlamVault run is queued and will start when the worker runs.
-- Reddit's public JSON returns 403 from this network for any User-Agent, so Reddit
-  queries go through SerpApi (`site:reddit.com`), which costs SerpApi searches.
-- Scoring time grows with hits (about 4 s per hit on gemma3:4b): a full run may take
-  several minutes. `SCOUT.maxHitsToScore` caps it at 150.
+- Lead quality is still poor. gemma3:4b gives off-topic Reddit posts high scores
+  (r/ClaudeCode 9/8, r/Passports 7/7) and calls how-to blogs "person". Reddit search
+  sorted by `new` matches loosely, so most Reddit hits are unrelated. Next: Reddit
+  `sort=relevance`, a keyword overlap pre-filter, and trying gemma3:12b as scorer.
+- Reddit's public JSON returns 403 from this network; RSS allows 1 request/minute.
+- Scoring is about 3.3 s per hit on gemma3:4b; 150 hits take 8 minutes.
 - Web results without a date are kept (can't apply the 30-day rule); SearXNG often has
   no date.
 - Hits scored below the thresholds are not stored, so the next run scores them again.

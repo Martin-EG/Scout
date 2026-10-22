@@ -33,6 +33,10 @@ export const SOURCES = {
     baseUrl: "https://www.reddit.com",
     /** Unauthenticated JSON is limited to ~10 req/min; stay well under. */
     minIntervalMs: 7_000,
+    /** search.rss (used when JSON answers 403) allows 1 request per minute. */
+    rssMinIntervalMs: 61_000,
+    /** RSS is slow at 1/min; after this many queries the rest go to the SerpApi fallback. */
+    rssMaxQueriesPerRun: 5,
     timeoutMs: 15_000,
     resultsPerQuery: 25,
     /** Reddit's `t` window: posts from the last month. */
@@ -46,7 +50,8 @@ export const SOURCES = {
     maxAgeDays: 30,
   },
   searxng: {
-    minIntervalMs: 2_000,
+    /** Upstream engines (DuckDuckGo, Brave) throttle bursts; keep calls spaced. */
+    minIntervalMs: 4_000,
     timeoutMs: 20_000,
     resultsPerQuery: 10,
   },
@@ -55,8 +60,10 @@ export const SOURCES = {
     minIntervalMs: 1_000,
     timeoutMs: 30_000,
     resultsPerQuery: 10,
-    /** Google `tbs` filter: past month. */
+    /** Google `tbs` filter: past month. Google ignores site restrictions when it is set. */
     timeFilter: "qdr:m",
+    /** Fixed UI language so dates come back in English ("3 days ago") and parse. */
+    uiLanguage: "en",
     /** SerpApi searches are metered; cap direct web queries per run (reddit fallback is extra). */
     maxWebQueriesPerRun: 4,
   },
@@ -81,6 +88,8 @@ export const SCOUT = {
   reasonChars: 400,
   /** Planning uses the larger model: one call per run, quality matters more than speed. */
   plannerTemperature: 0.4,
+  /** The 12b planner can need >2 min on a cold start (model load + ~20 queries). */
+  plannerTimeoutMs: 300_000,
   scorerTemperature: 0.1,
   /** Listing pages, never conversations: dropped before scoring (the project's own domain is too). */
   skipDomains: ["apps.apple.com", "play.google.com", "chromewebstore.google.com", "producthunt.com"],

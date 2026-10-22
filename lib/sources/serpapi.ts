@@ -44,7 +44,7 @@ export function mapSerpApiResponse(body: unknown, now: number): Hit[] {
   return hits;
 }
 
-/** SerpApi Google results from the past month. Also serves `site:reddit.com` fallback queries. */
+/** SerpApi Google results from the past month. Also serves Reddit fallback queries (site: reddit.com). */
 export class SerpApiSource implements SourceAdapter {
   readonly source = "serpapi";
   private readonly fetchImpl: typeof fetch;
@@ -64,10 +64,13 @@ export class SerpApiSource implements SourceAdapter {
       engine: "google",
       q: query,
       num: String(cfg.resultsPerQuery),
-      tbs: cfg.timeFilter,
+      hl: cfg.uiLanguage,
       api_key: this.apiKey,
     });
-    if (opts?.lang) params.set("hl", opts.lang);
+    // Google drops the site restriction under a time filter, so site searches go
+    // without it and their hits are usually undated.
+    if (opts?.site) params.set("as_sitesearch", opts.site);
+    else params.set("tbs", cfg.timeFilter);
     await this.throttle();
     const body = await getJSON(`${cfg.baseUrl}?${params}`, {
       source: this.source,
