@@ -2,9 +2,12 @@
 // Keep in sync with supabase/migrations.
 import type { Click, Draft, Lead, Project, Run, Venue } from "./domain";
 
-type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
-type WithJsonQueries<T> = Omit<T, "queries"> & { queries: Json };
+type WithJsonQueries<T> = Omit<T, "queries" | "step_durations"> & {
+  queries: Json;
+  step_durations: Json;
+};
 
 /** Columns with DB defaults become optional on insert. */
 type Table<Row, DefaultedKeys extends keyof Row> = {
@@ -49,6 +52,7 @@ export type Database = {
         | "hits_found"
         | "leads_kept"
         | "error"
+        | "step_durations"
         | "created_at"
       >;
       clicks: Table<Click, "id" | "venue_id" | "draft_id" | "clicked_at" | "referrer">;

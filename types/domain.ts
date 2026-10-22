@@ -75,8 +75,13 @@ export type Run = {
   hits_found: number;
   leads_kept: number;
   error: string | null;
+  /** Milliseconds per pipeline step (plan, search, score). */
+  step_durations: StepDurations;
   created_at: string;
 };
+
+export type RunStep = "plan" | "search" | "score";
+export type StepDurations = Partial<Record<RunStep, number>>;
 
 export type Click = {
   id: string;
@@ -87,11 +92,18 @@ export type Click = {
   referrer: string | null;
 };
 
+export type HitSource = "reddit" | "hackernews" | "searxng" | "serpapi";
+
 /** A search result, the common output of every lib/sources adapter. */
 export type Hit = {
-  source: string;
+  source: HitSource;
   url: string;
   title: string;
-  snippet: string | null;
-  postedAt: string | null;
+  snippet: string;
+  author?: string;
+  /** ISO 8601. Missing when the source gives no date (common for web results). */
+  postedAt?: string;
+  /** Where the conversation lives: "r/MakeupAddiction", "Hacker News", "example.com". */
+  venueName: string;
+  venueUrl: string;
 };

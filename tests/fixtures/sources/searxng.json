@@ -1,0 +1,57 @@
+{
+  "query": "makeup inventory app",
+  "number_of_results": 4,
+  "results": [
+    {
+      "title": "Free makeup inventory apps? : r/MakeupRehab - Reddit",
+      "content": "... Not marketed for makeup but ultimate wish list allows you to add a picture, a price, a catagory, a description (so u could put weather you liked it or not in the description or something), and u can also make multiple wishlists.",
+      "url": "https://www.reddit.com/r/MakeupRehab/comments/q7p0v6/free_makeup_inventory_apps/",
+      "engine": "google cse",
+      "engines": [
+        "brave",
+        "google cse"
+      ],
+      "publishedDate": null,
+      "score": 3.0,
+      "category": "general"
+    },
+    {
+      "title": "GlowinMe: Beauty Tracker - App Store - Apple",
+      "content": "Personal Skincare Routine App · Сosmetic & Ingredient Scanner · View · Panapp - Makeup Collection · Keep track of your pan project · View · Vannie: Project Pan Tracker · Makeup Inventory & Empties Log · View · Project Pan Journey · Makeup ...",
+      "url": "https://apps.apple.com/us/app/glowinme-beauty-tracker/id1450130797",
+      "engine": "google cse",
+      "engines": [
+        "brave",
+        "google cse"
+      ],
+      "publishedDate": null,
+      "score": 1.6666666666666665,
+      "category": "general"
+    },
+    {
+      "title": "BeautiStics: Makeup Organizer - App Store - Apple",
+      "content": "Inventory & Project Pan · Only for iPhone · Free · In‑App Purchases · Designed for iPhone. Not verified for macOS. Share · 25 Ratings · 4.4 · Age Rating · 4+ Years · Category · Lifestyle · Developer · Maxim Solntsev · Language ...",
+      "url": "https://apps.apple.com/us/app/beautistics-makeup-organizer/id1455000363",
+      "engine": "google cse",
+      "engines": [
+        "brave",
+        "google cse"
+      ],
+      "publishedDate": null,
+      "score": 1.1666666666666665,
+      "category": "general"
+    },
+    {
+      "title": "How I track expiry dates",
+      "content": "A short post on tracking open dates.",
+      "url": "https://blog.example.com/posts/expiry/?ref=twitter",
+      "engine": "brave",
+      "engines": [
+        "brave"
+      ],
+      "publishedDate": "2026-10-12T00:00:00",
+      "score": 0.5,
+      "category": "general"
+    }
+  ]
+}

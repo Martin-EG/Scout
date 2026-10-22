@@ -1,0 +1,40 @@
+{
+  "hits": [
+    {
+      "author": "mrandish",
+      "comment_text": "There are multiple causes. Two big ones are:<p>- Increasingly rapid proliferation of business strategy, competitive analysis and spreadsheet-driven financial optimization means more MBAs in a given industry trying to run similar playbooks at the same time. This increasing homogenization occurs at both the company level and the investor level.<p>- Corporate executives and managers can have divergen",
+      "created_at": "2026-10-21T21:37:50Z",
+      "created_at_i": 1792618670,
+      "objectID": "50188025",
+      "parent_id": 50187653,
+      "story_id": 50184586,
+      "story_title": "EA is shutting down BioWare",
+      "story_url": "https://www.theverge.com/games/1015647/ea-is-shutting-down-bioware"
+    },
+    {
+      "author": "loeg",
+      "created_at": "2026-10-21T20:17:25Z",
+      "created_at_i": 1792613845,
+      "objectID": "50187025",
+      "story_id": 50187025,
+      "title": "Meta Reports Third Quarter 2026 Results",
+      "url": "https://investor.atmeta.com/investor-news/press-release-details/2026/Meta-Reports-Third-Quarter-2026-Results/default.aspx",
+      "num_comments": 1,
+      "points": 4
+    },
+    {
+      "author": "tancop",
+      "comment_text": "Why would it? The point of Gemini is provide user facing services cheaper than if they were paying OpenAI, make some money on the side with API credits and position themselves as a leader when investors want to see AI everywhere.<p>Google Cloud is competing with AWS. Amazon has Bedrock so Google needs to keep up with them by serving both Claude and GPT, along with Gemini and open models.",
+      "created_at": "2026-10-21T17:56:33Z",
+      "created_at_i": 1792605393,
+      "objectID": "50184990",
+      "parent_id": 50184755,
+      "story_id": 50180079,
+      "story_title": "OpenAI models are coming to Google Cloud",
+      "story_url": "https://openai.com/index/openai-models-google-cloud/"
+    }
+  ],
+  "nbHits": 3,
+  "page": 0,
+  "hitsPerPage": 3
+}

@@ -1,0 +1,14 @@
+# Local search for Scout. SearXNG at http://localhost:8080 (SEARXNG_URL), JSON API enabled.
+services:
+  searxng:
+    image: docker.io/searxng/searxng:latest
+    container_name: scout-searxng
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./searxng:/etc/searxng:rw
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8080/
+      # Local-only instance; override in your shell for anything else.
+      - SEARXNG_SECRET=${SEARXNG_SECRET:-scout-local-dev-only}
+    restart: unless-stopped

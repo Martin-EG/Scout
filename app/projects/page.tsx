@@ -1,16 +1,19 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { DeleteProjectButton } from "@/components/projects/DeleteProjectButton";
+import { RunPanel } from "@/components/runs/RunPanel";
 import { buttonClass } from "@/components/ui/Button";
 import { requireUser } from "@/lib/db/auth";
 import { listProjects } from "@/lib/db/projects";
-import { removeProject } from "./actions";
+import { listRecentRuns } from "@/lib/db/runs";
+import { getRecentRuns, removeProject, startRun } from "./actions";
 
 export const metadata = { title: "Projects · Scout" };
 
 async function ProjectList() {
   await requireUser();
   const projects = await listProjects();
+  const runs = await Promise.all(projects.map((project) => listRecentRuns(project.id)));
 
   if (projects.length === 0) {
     return (
@@ -22,9 +25,9 @@ async function ProjectList() {
 
   return (
     <ul className="divide-y divide-zinc-200 rounded-md border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
-      {projects.map((project) => (
+      {projects.map((project, i) => (
         <li key={project.id} className="flex items-start justify-between gap-4 p-4">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="font-medium">{project.name}</p>
             <a
               href={project.url}
@@ -39,8 +42,17 @@ async function ProjectList() {
                 {project.description}
               </p>
             )}
+            <RunPanel
+              projectId={project.id}
+              initialRuns={runs[i]}
+              startRun={startRun}
+              getRuns={getRecentRuns}
+            />
           </div>
           <div className="flex shrink-0 items-center gap-3">
+            <Link href={`/projects/${project.id}/leads`} className="text-sm hover:underline">
+              Leads
+            </Link>
             <Link href={`/projects/${project.id}/edit`} className="text-sm hover:underline">
               Edit
             </Link>

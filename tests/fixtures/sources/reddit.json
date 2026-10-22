@@ -1,0 +1,39 @@
+{
+  "kind": "Listing",
+  "data": {
+    "after": null,
+    "dist": 2,
+    "children": [
+      {
+        "kind": "t3",
+        "data": {
+          "subreddit": "MakeupRehab",
+          "title": "Is there an app that tells me if I already own a shade?",
+          "selftext": "I keep buying the same nude lipstick. I want something on my phone I can check in the store.",
+          "author": "lipsticklover22",
+          "created_utc": 1792000000,
+          "permalink": "/r/MakeupRehab/comments/1x2y3z/is_there_an_app_that_tells_me_if_i_already_own_a/",
+          "url": "https://www.reddit.com/r/MakeupRehab/comments/1x2y3z/is_there_an_app_that_tells_me_if_i_already_own_a/",
+          "num_comments": 14,
+          "score": 32,
+          "over_18": false
+        }
+      },
+      {
+        "kind": "t3",
+        "data": {
+          "subreddit": "Sephora",
+          "title": "Haul from the VIB sale",
+          "selftext": "",
+          "author": "[deleted]",
+          "created_utc": 1791900000.0,
+          "permalink": "/r/Sephora/comments/1a1b1c/haul_from_the_vib_sale/",
+          "url": "https://i.redd.it/abc123.jpg",
+          "num_comments": 3,
+          "score": 5,
+          "over_18": false
+        }
+      }
+    ]
+  }
+}

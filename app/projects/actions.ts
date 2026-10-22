@@ -9,6 +9,8 @@ import {
   projectInputSchema,
 } from "@/lib/db/projectInput";
 import { createProject, deleteProject, updateProject } from "@/lib/db/projects";
+import { listRecentRuns, queueRun, type RunSummary } from "@/lib/db/runs";
+import { QUOTAS } from "@/lib/config";
 import type { ProjectFormState } from "@/components/projects/ProjectForm";
 
 const idSchema = z.uuid();
@@ -46,4 +48,29 @@ export async function removeProject(formData: FormData): Promise<void> {
     throw new Error("Could not delete the project.");
   }
   redirect("/projects");
+}
+
+export type StartRunState = { error?: string; queued?: boolean };
+
+const QUEUE_ERRORS = {
+  quota: `Daily limit reached (${QUOTAS.runsPerUserPerDay} runs per day). Try again tomorrow (UTC).`,
+  active: "This project already has a run queued or in progress.",
+} as const;
+
+export async function startRun(projectId: string): Promise<StartRunState> {
+  const user = await requireUser();
+  const id = idSchema.safeParse(projectId);
+  if (!id.success) return { error: "Invalid project id." };
+  try {
+    const result = await queueRun(id.data);
+    return result.ok ? { queued: true } : { error: QUEUE_ERRORS[result.reason] };
+  } catch (err) {
+    console.error("[runs] queue failed", { userId: user.id, projectId: id.data, err });
+    return { error: "Could not start the run. Try again." };
+  }
+}
+
+export async function getRecentRuns(projectId: string): Promise<RunSummary[]> {
+  await requireUser();
+  return listRecentRuns(idSchema.parse(projectId));
 }

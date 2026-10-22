@@ -23,6 +23,79 @@ export const QUOTAS = {
 
 export const VENUE_COOLDOWN_DAYS = 7;
 
+// ---- Sources ----
+
+/** Sent on every source request. Identifies Scout as a read-only research client. */
+export const SOURCE_USER_AGENT = "ScoutLeadFinder/0.1 (read-only search; indie dev tool)";
+
+export const SOURCES = {
+  reddit: {
+    baseUrl: "https://www.reddit.com",
+    /** Unauthenticated JSON is limited to ~10 req/min; stay well under. */
+    minIntervalMs: 7_000,
+    timeoutMs: 15_000,
+    resultsPerQuery: 25,
+    /** Reddit's `t` window: posts from the last month. */
+    timeWindow: "month",
+  },
+  hackernews: {
+    baseUrl: "https://hn.algolia.com/api/v1",
+    minIntervalMs: 1_000,
+    timeoutMs: 15_000,
+    resultsPerQuery: 20,
+    maxAgeDays: 30,
+  },
+  searxng: {
+    minIntervalMs: 2_000,
+    timeoutMs: 20_000,
+    resultsPerQuery: 10,
+  },
+  serpapi: {
+    baseUrl: "https://serpapi.com/search.json",
+    minIntervalMs: 1_000,
+    timeoutMs: 30_000,
+    resultsPerQuery: 10,
+    /** Google `tbs` filter: past month. */
+    timeFilter: "qdr:m",
+    /** SerpApi searches are metered; cap direct web queries per run (reddit fallback is extra). */
+    maxWebQueriesPerRun: 4,
+  },
+} as const;
+
+// ---- Scout pipeline ----
+
+export const SCOUT = {
+  minQueries: 10,
+  maxQueries: 20,
+  /** Hits older than this are dropped before and after scoring. */
+  maxHitAgeDays: 30,
+  minRelevance: 6,
+  minIntent: 5,
+  scoreBatchSize: 5,
+  /** Upper bound on hits sent to the scorer per run (newest first). */
+  maxHitsToScore: 150,
+  /** Characters of each hit's snippet shown to the scorer. */
+  scoreSnippetChars: 600,
+  /** Max characters stored for a lead snippet and reason. */
+  leadSnippetChars: 1_000,
+  reasonChars: 400,
+  /** Planning uses the larger model: one call per run, quality matters more than speed. */
+  plannerTemperature: 0.4,
+  scorerTemperature: 0.1,
+  /** Listing pages, never conversations: dropped before scoring (the project's own domain is too). */
+  skipDomains: ["apps.apple.com", "play.google.com", "chromewebstore.google.com", "producthunt.com"],
+} as const;
+
+export const WORKER = {
+  pollIntervalMs: 5_000,
+} as const;
+
+/** Runs list on the projects page. */
+export const RUNS_UI = {
+  pollIntervalMs: 5_000,
+  recentRunsShown: 5,
+} as const;
+
 export const PROJECT_LIMITS = {
   nameMax: 120,
   textMax: 2000,
