@@ -98,6 +98,6 @@ Getting lead quality right took most of the week, and it's the part I learned th
 - Weekly schedules, so the sloth works while I sleep.
 - Learning from the drafts I approve and reject.
 
-Code: <REPO LINK PLACEHOLDER> (MIT)
+Code: https://github.com/Martin-EG/Scout (MIT)
 
 Thanks for reading. Now if you'll excuse me, Scout has some threads to read and I have a nap to take. 🦥

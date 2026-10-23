@@ -218,7 +218,7 @@ Gemma 3 12B is an 8 GB download and needs about that much free memory to run.
 
 1. Clone and install:
    ```bash
-   git clone <this repo> scout && cd scout && pnpm install
+   git clone https://github.com/Martin-EG/Scout.git scout && cd scout && pnpm install
    ```
 2. Pull the model (8 GB):
    ```bash
