@@ -7,7 +7,7 @@ import { buttonClass } from "@/components/ui/Button";
 import { requireUser } from "@/lib/db/auth";
 import { getProjectOverview } from "@/lib/db/inbox";
 import { listProjects } from "@/lib/db/projects";
-import { listRecentRuns } from "@/lib/db/runs";
+import { listRecentRuns, runsLeftToday } from "@/lib/db/runs";
 import { getRecentRuns, removeProject, startRun } from "./actions";
 
 export const metadata = { title: "Projects · Scout" };
@@ -15,9 +15,10 @@ export const metadata = { title: "Projects · Scout" };
 async function ProjectList() {
   await requireUser();
   const projects = await listProjects();
-  const [runs, overviews] = await Promise.all([
+  const [runs, overviews, runsLeft] = await Promise.all([
     Promise.all(projects.map((project) => listRecentRuns(project.id))),
     Promise.all(projects.map((project) => getProjectOverview(project.id))),
+    runsLeftToday(),
   ]);
 
   if (projects.length === 0) {
@@ -50,7 +51,7 @@ async function ProjectList() {
             <ProjectStats overview={overviews[i]} />
             <RunPanel
               projectId={project.id}
-              initialRuns={runs[i]}
+              initialState={{ runs: runs[i], runsLeft }}
               startRun={startRun}
               getRuns={getRecentRuns}
             />

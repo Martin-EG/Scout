@@ -21,6 +21,7 @@ export const LLM = {
 } as const;
 
 export const QUOTAS = {
+  /** Counted per UTC day across the user's projects. Failed runs don't count. */
   runsPerUserPerDay: 3,
 } as const;
 
@@ -166,6 +167,8 @@ export const WORKER = {
 export const RUNS_UI = {
   pollIntervalMs: 5_000,
   recentRunsShown: 5,
+  /** A run still queued after this long probably has no worker picking it up. */
+  workerHintAfterMs: 30_000,
 } as const;
 
 export const PROJECT_LIMITS = {

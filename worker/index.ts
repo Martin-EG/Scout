@@ -3,6 +3,7 @@ import { getEnv, WORKER } from "@/lib/config";
 import { claimNextRun, completeRun, failRun, failStaleRuns } from "@/lib/db/runQueue";
 import { createServiceSupabase } from "@/lib/db/service";
 import { createLLMProvider, getModels } from "@/lib/llm";
+import { checkServices } from "@/lib/scout/health";
 import { errorMessage } from "@/lib/scout/log";
 import { createSources } from "@/lib/sources";
 import { RunStepError, runScout, type ScoutDeps } from "./runScout";
@@ -18,6 +19,20 @@ async function processNext(deps: Omit<ScoutDeps, "sources">): Promise<boolean> {
   const ctx = { projectId: project.id, runId: run.id };
   const started = Date.now();
   console.log("[worker] run started", { ...ctx, project: project.name });
+
+  const env = getEnv();
+  const problems = await checkServices({
+    ollamaUrl: env.OLLAMA_BASE_URL,
+    searxngUrl: env.SEARXNG_URL,
+    models: Object.values(deps.models),
+  });
+  if (problems.length > 0) {
+    console.error("[worker] services not ready, run failed", { ...ctx, problems });
+    await failRun(deps.supabase, run.id, problems.join(" ")).catch((err: unknown) =>
+      console.error("[worker] could not record failure", { ...ctx, error: errorMessage(err) }),
+    );
+    return true;
+  }
 
   try {
     // Fresh adapters per run: rate limiters and the reddit-blocked flag start clean.

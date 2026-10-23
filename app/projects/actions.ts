@@ -9,7 +9,7 @@ import {
   projectInputSchema,
 } from "@/lib/db/projectInput";
 import { createProject, deleteProject, updateProject } from "@/lib/db/projects";
-import { listRecentRuns, queueRun, type RunSummary } from "@/lib/db/runs";
+import { listRecentRuns, queueRun, runsLeftToday, type RunSummary } from "@/lib/db/runs";
 import { QUOTAS } from "@/lib/config";
 import type { ProjectFormState } from "@/components/projects/ProjectForm";
 
@@ -53,7 +53,7 @@ export async function removeProject(formData: FormData): Promise<void> {
 export type StartRunState = { error?: string; queued?: boolean };
 
 const QUEUE_ERRORS = {
-  quota: `Daily limit reached (${QUOTAS.runsPerUserPerDay} runs per day). Try again tomorrow (UTC).`,
+  quota: `Daily limit reached (${QUOTAS.runsPerUserPerDay} runs per day; failed runs don't count). Try again tomorrow (UTC).`,
   active: "This project already has a run queued or in progress.",
 } as const;
 
@@ -70,7 +70,13 @@ export async function startRun(projectId: string): Promise<StartRunState> {
   }
 }
 
-export async function getRecentRuns(projectId: string): Promise<RunSummary[]> {
+export interface RunsState {
+  runs: RunSummary[];
+  runsLeft: number;
+}
+
+export async function getRecentRuns(projectId: string): Promise<RunsState> {
   await requireUser();
-  return listRecentRuns(idSchema.parse(projectId));
+  const [runs, runsLeft] = await Promise.all([listRecentRuns(idSchema.parse(projectId)), runsLeftToday()]);
+  return { runs, runsLeft };
 }
