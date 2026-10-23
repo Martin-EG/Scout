@@ -264,7 +264,8 @@ Gemma 3 12B is an 8 GB download and needs about that much free memory to run.
    exits. If Ollama, the model, or SearXNG is missing, the run fails with a message saying
    what to start or pull.
 
-Checks:
+Checks (lint, types, and tests need no env; `pnpm build` and `pnpm worker` need
+`.env.local` and stop with "Invalid environment variables" without it):
 
 ```bash
 pnpm lint && pnpm typecheck && pnpm test
@@ -516,3 +517,22 @@ Rescore of stored leads with gemma3:12b and the new rules (age rule ignored):
 Known issues:
 - Leads and drafts stored before this change keep their old status; Sloth Roll's inbox
   still has drafts for competitor launch posts. Reject them there.
+
+### 2026-10-23 — Day 5: v1.0 release prep
+
+Done:
+- README rewritten for release: pitch, why it fits "Slow and Steady", open pieces with
+  links and licenses, partner tech (Gemma, SerpApi), Mermaid architecture, guardrails,
+  setup from zero with an env table, limitations and roadmap, screenshot/video placeholders.
+- `LICENSE` (MIT), `CONTRIBUTING.md`, `package.json` version 1.0.0.
+- Secrets: no Supabase keys, SerpApi key, or JWT-like strings anywhere in git history;
+  only `.env.example` was ever committed. `.env.example` lists every variable the code
+  reads (plus a note on `SEARXNG_SECRET`).
+- `/dev/llm` was already off in production (page 404s, action refuses, menu link
+  hidden). Remaining `console.log` calls are the worker's and seed script's run logs
+  (none in the web app). No TODOs.
+- Fresh clone: `pnpm install --frozen-lockfile`, lint, typecheck, and 91 tests pass
+  with no env; `pnpm build` and `pnpm worker` stop with a clear env error until
+  `.env.local` exists.
+- `docs/dev-post.md`: DEV submission draft with real run durations; placeholders for the
+  time-saved table, your inbox time, demo video, and repo link.
