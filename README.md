@@ -33,7 +33,8 @@ What works today:
      English and Spanish, each tagged `reddit`, `hn`, or `web` (falls back to the project's
      keywords if the model fails).
    - **search**: Reddit, Hacker News (Algolia), SearXNG, and SerpApi (Google, past month).
-     Each source has a timeout, a User-Agent, and its own rate limit. Reddit tries
+     Each source has a timeout, a User-Agent, and its own rate limit. Reddit searches by
+     relevance within the last month. Reddit tries
      `search.json`; on 403 it switches to `search.rss` (1 request/minute, 5 per run); after
      that, Reddit queries run on SerpApi restricted to reddit.com (no time filter, because
      Google ignores the site restriction with one). SerpApi is skipped when `SERPAPI_KEY`
@@ -41,7 +42,10 @@ What works today:
    - **dedupe**: URLs normalized (tracking params, fragments, trailing slashes, reddit
      hosts) and dropped if already a lead for the project (dismissed ones included).
      App-store listings and the project's own site are dropped; hits older than 30 days too.
-   - **score**: `SCORER_MODEL` (gemma3:4b) scores batches of 5 hits: author type
+     Keyword gate: a hit must contain one of the project's keyword phrases, or two distinct
+     keyword words, in its title or snippet (so project keywords now matter).
+   - **score**: `SCORER_MODEL` (default gemma3:4b; gemma3:12b recommended, see Dev log)
+     scores batches of 5 hits: author type
      (person or publisher), relevance and intent (0-10), and a reason. Kept if a person
      wrote it, relevance ≥ 6, and intent ≥ 5. Venues are upserted
      (subreddit, Hacker News, or domain) and leads inserted.
@@ -215,3 +219,41 @@ Known issues:
   no date.
 - Hits scored below the thresholds are not stored, so the next run scores them again.
 - Quota check and insert are two queries; two very fast clicks could both pass.
+
+### 2026-10-23 — Day 3: lead quality (Reddit relevance, keyword gate, 12b scorer A/B)
+
+Built:
+- Reddit search sorts by `relevance` (`SOURCES.reddit.sort`); `new` returned loose matches.
+- `lib/scout/keywords.ts`: keyword gate before scoring (accent/case/hyphen-insensitive
+  phrase match, or ≥ 2 distinct keyword words; `SCOUT.minKeywordTokenOverlap`). Wired in
+  `worker/runScout.ts`; the run log reports `onTopic`.
+- `normalizeUrl` strips Reddit's `tl` translation param (same thread was stored twice).
+- Tests: 57 passing (keyword gate, `tl`).
+
+Run 3 (GlamVault, `SCORER_MODEL=gemma3:12b`): 282 hits, 274 unique, 83 on topic, 77 scored,
+30 leads. plan 53 s, search 4 m 07 s, score 11 m 32 s, total 16 m 33 s.
+Compared with run 2 (gemma3:4b, no gate, `sort=new`: 288 hits, 150 scored, 12 leads,
+13 m 17 s, about 3 of 12 on topic): about 23 of 30 are people talking about their makeup
+collections in r/MakeupRehab, r/ProjectPan, r/makeuporganization, Beautylish; the rest
+are creators' videos and reels.
+
+A/B: the same 42 stored leads (runs 2 and 3) rescored by both models:
+- gemma3:4b: 110 s (2.6 s/hit). gemma3:12b: 398 s (9.5 s/hit), 3.6x slower.
+- On run 2's leads, 4b kept 5 of 12 (including a Mealime clone launch and a competitor's
+  "I made an app" post); 12b kept 1 (the r/Makeup "app to track my collection" thread)
+  and scored the competitor post intent 0.
+- On run 3's leads, 4b kept 18 of 30 and 12b 23 of 30; differences are borderline posts.
+  12b rescoring its own run kept 23 of the 30 it kept in the run: scores near the
+  thresholds are not stable between calls.
+- Both models labeled every one of the 42 as `author_type: person`, blogs included:
+  the field filters nothing yet; the intent score does the work.
+
+Known issues:
+- Undated web results bypass the 30-day rule. In run 3, SearXNG/SerpApi returned Reddit
+  threads from 2018-2023 without dates, and they rank at the top. Fix next: estimate a
+  Reddit post's date from its base-36 id, calibrated on dated Reddit hits in the run.
+- The default scorer is still gemma3:4b (CLAUDE.md: small model for scoring). 12b is
+  clearly better at rejecting off-topic posts but makes runs about 4 minutes longer.
+- Leads stored before the `tl` fix keep their duplicates.
+- The keyword gate can drop real leads whose snippet is cut short (a Facebook group
+  question with only "inventory" in its snippet).

@@ -77,7 +77,7 @@ export function mapRedditRss(xml: string): Hit[] {
 }
 
 /**
- * Reddit public search, newest posts from the last month. Uses search.json;
+ * Reddit public search, most relevant posts from the last month. Uses search.json;
  * after a 403/429 there it switches to search.rss (1 request/minute, capped
  * per run). Throws SourceBlockedError when both are unavailable.
  */
@@ -98,7 +98,7 @@ export class RedditSource implements SourceAdapter {
   async search(query: string): Promise<Hit[]> {
     const params = new URLSearchParams({
       q: query,
-      sort: "new",
+      sort: cfg.sort,
       t: cfg.timeWindow,
       type: "link",
       limit: String(cfg.resultsPerQuery),

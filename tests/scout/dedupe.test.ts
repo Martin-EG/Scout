@@ -31,6 +31,7 @@ describe("normalizeUrl", () => {
       canonical,
     );
     expect(normalizeUrl("https://np.reddit.com/r/MakeupRehab/comments/abc/title")).toBe(canonical);
+    expect(normalizeUrl("https://www.reddit.com/r/MakeupRehab/comments/abc/title?tl=es-419")).toBe(canonical);
   });
 
   it("keeps the HN item id param", () => {

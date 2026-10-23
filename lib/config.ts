@@ -39,6 +39,8 @@ export const SOURCES = {
     rssMaxQueriesPerRun: 5,
     timeoutMs: 15_000,
     resultsPerQuery: 25,
+    /** `new` matched any word loosely (r/Passports for "makeup" queries); relevance stays on topic. */
+    sort: "relevance",
     /** Reddit's `t` window: posts from the last month. */
     timeWindow: "month",
   },
@@ -91,6 +93,11 @@ export const SCOUT = {
   /** The 12b planner can need >2 min on a cold start (model load + ~20 queries). */
   plannerTimeoutMs: 300_000,
   scorerTemperature: 0.1,
+  /**
+   * Keyword pre-filter: a hit must contain one of the project's keyword phrases, or at
+   * least this many distinct keyword words, before it reaches the scorer.
+   */
+  minKeywordTokenOverlap: 2,
   /** Listing pages, never conversations: dropped before scoring (the project's own domain is too). */
   skipDomains: ["apps.apple.com", "play.google.com", "chromewebstore.google.com", "producthunt.com"],
 } as const;

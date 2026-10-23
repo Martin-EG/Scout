@@ -15,6 +15,8 @@ const TRACKING_PARAMS = new Set([
   "ref_url",
   "share_id",
   "si",
+  // Reddit's machine-translation view (?tl=es-419): same thread.
+  "tl",
   "_ga",
 ]);
 
