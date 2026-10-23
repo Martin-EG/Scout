@@ -2,13 +2,19 @@ import "server-only";
 
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { connection } from "next/server";
 import { getEnv } from "@/lib/config";
 import type { Database } from "@/types/database";
 
-/** Supabase client bound to the request's auth cookies. RLS applies. */
+/**
+ * Supabase client bound to the request's auth cookies. RLS applies.
+ * connection() defers to request time: getClaims() checks token expiry with
+ * Date.now(), which Cache Components rejects during (runtime) prerendering.
+ */
 export async function createServerSupabase() {
   const env = getEnv();
   const cookieStore = await cookies();
+  await connection();
 
   return createServerClient<Database>(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
     cookies: {

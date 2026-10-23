@@ -9,9 +9,9 @@ copies, and posts. Scout NEVER posts anything itself. First test project: GlamVa
 - Next.js (App Router), TypeScript strict, Tailwind, pnpm
 - Supabase: Postgres, email auth, row-level security, migrations in supabase/migrations
 - Worker: Node + TypeScript (tsx), polls the runs table
-- LLM: Ollama, Gemma models (latest Gemma tags in the Ollama library: a small one for
-  scoring, a larger one for drafts), via its OpenAI-compatible API behind an LLMProvider
-  interface. Gemma is required: we enter the Best Use of Gemma category.
+- LLM: Ollama, Gemma models (latest Gemma tags in the Ollama library; gemma3:12b for
+  planning, scoring, and drafts since day 3: 4b scored off-topic posts too high), via its
+  OpenAI-compatible API behind an LLMProvider interface. Gemma is required: we enter the Best Use of Gemma category.
 - Search: SearXNG (docker-compose), Reddit search, Hacker News (Algolia) search,
   SerpApi (Google results; Best Use of SerpApi category)
 - Validation: Zod for env, API input, and every LLM output

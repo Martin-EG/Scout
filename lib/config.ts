@@ -2,8 +2,11 @@ import { z } from "zod";
 
 // ---- Constants (no magic numbers elsewhere) ----
 
-/** Default Ollama models. Small Gemma for scoring, larger Gemma for drafts. Override via env. */
-export const DEFAULT_SCORER_MODEL = "gemma3:4b";
+/**
+ * Default Ollama models, overridable via env. Scoring uses the 12b model too: in a
+ * 42-lead A/B (README dev log, 2026-10-23) 4b kept off-topic posts that 12b rejected.
+ */
+export const DEFAULT_SCORER_MODEL = "gemma3:12b";
 export const DEFAULT_DRAFTER_MODEL = "gemma3:12b";
 export const DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434";
 export const DEFAULT_SEARXNG_URL = "http://localhost:8080";
