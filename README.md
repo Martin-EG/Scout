@@ -1,18 +1,78 @@
 # Scout
 
-## Overview
+**You built the app. Scout finds the users.**
 
-Scout helps indie devs find people who need their app. You add an app; an open-weight
-LLM agent (Gemma via Ollama) finds where potential users hang out, surfaces threads with
-buying intent, and drafts honest replies. You approve, copy, and post yourself.
+Scout is a self-hosted web app for indie developers. Add your app and Scout's agent,
+running on open-weight Gemma models, finds the threads where people describe the problem
+your app solves, scores them for real buying intent, and drafts honest replies that help
+first and disclose that you built the thing. You read, edit, copy, and post yourself.
 **Scout never posts anything.**
 
-First test project: [GlamVault](https://try-glamvault.vercel.app/), a personal beauty
-collection manager.
+Built for the [Hacktoberfest Open-Source AI Challenge, Week 3: Slow and Steady](https://dev.to/challenges/hf26)
+(#hf26challenge). First test project: [GlamVault](https://try-glamvault.vercel.app/), a
+personal beauty collection manager; second: Sloth Roll, an iOS app that turns screenshots
+into calendar events, map pins, and expenses.
+
+> Screenshot: projects page with Run now and the runs table — _placeholder_
+>
+> Screenshot: inbox with a lead card and its draft — _placeholder_
+>
+> Demo video (90 s): _link placeholder_
+
+## Why "Slow and Steady"
+
+Marketing is the chore indie developers put off. Finding the five Reddit threads a week
+where someone asks for exactly your app means reading hundreds that don't. Scout does the
+searching, reading, and first-draft writing while you do nothing: press **Run now**, walk
+away, come back to an inbox of drafts. A run takes 10-30 minutes on a laptop, because the
+models run locally and Scout is polite to every site it reads. Slow is fine; you weren't
+going to do it anyway.
+
+## Open pieces that make it work
+
+| Piece | What Scout uses it for | License |
+|---|---|---|
+| [Gemma 3 12B](https://ai.google.dev/gemma) via [`gemma3:12b`](https://ollama.com/library/gemma3) | plans search queries, scores every hit, writes every draft and venue suggestion | [Gemma Terms of Use](https://ai.google.dev/gemma/terms) |
+| [Ollama](https://ollama.com) ([GitHub](https://github.com/ollama/ollama)) | runs Gemma locally behind an OpenAI-compatible API (`lib/llm/ollama.ts`) | MIT |
+| [SearXNG](https://github.com/searxng/searxng) | self-hosted metasearch for web results (`docker-compose.yml`) | AGPL-3.0 |
+| [Next.js](https://nextjs.org), [Supabase](https://supabase.com), [Zod](https://zod.dev) | web app, Postgres + auth + row-level security, validation of every LLM reply | MIT / Apache-2.0 / MIT |
+
+Why open weights:
+- **No per-run cost.** A run makes about 30-50 model calls (1 plan, 10-30 scoring
+  batches of 5 hits, 15 drafts, 1 venue list, plus retries). On a hosted API that's a bill per run; on a
+  laptop it's electricity.
+- **Your data stays local.** Your app's positioning, the threads you're eyeing, and your
+  drafts never go to a model provider.
+- **Tunable and swappable.** Models are env settings behind an `LLMProvider` interface. We
+  measured 4B vs 12B on the same 42 leads and switched scoring to 12B because it rejected
+  off-topic posts that 4B kept (Dev log, 2026-10-23).
+- **Self-hostable end to end.** Ollama + SearXNG + Supabase (self-hostable) + this repo.
+
+## Partner tech
+
+- **Gemma (Best Use of Gemma):** every LLM step is Gemma 3 12B through Ollama: query
+  planning in English and Spanish, intent/relevance/self-promotion scoring with Zod-checked
+  JSON, drafting under product rules (≤ 120 words, disclosure, no link unless allowed),
+  and manual venue ideas. Every output is validated, retried once, then skipped.
+- **SerpApi (Best Use of SerpApi):** Google results from the past month for web queries,
+  and the Reddit fallback (`as_sitesearch=reddit.com`) when Reddit refuses unauthenticated
+  search (`lib/sources/serpapi.ts`). Budgeted per run; skipped cleanly without a key.
+
+## Guardrails
+
+- **Never posts.** No platform write APIs, anywhere. You copy the draft and post it.
+- **Disclosure required.** A draft without "I built…" (or the Spanish equivalent) is
+  rejected and retried; one over 120 words too.
+- **Links only where allowed.** Drafts include a link only when the venue's link policy
+  allows it; otherwise "happy to share the link".
+- **Venue cooldown.** The inbox warns when you posted in the same venue in the last 7 days.
+- **Quotas.** 3 runs per user per day; failed runs don't count.
+- **Polite reading.** Per-source rate limits, timeouts, an honest User-Agent, Reddit RSS at
+  1 request per minute.
+- **No competitor spam.** Posts where the author launches their own app are dropped, so
+  you don't reply to fellow builders with a pitch.
 
 ## How it works
-
-What works today:
 
 1. **Sign in** with email + password (Supabase Auth). Every route except `/sign-in` and
    the email-confirmation callback redirects to sign-in when signed out (`proxy.ts`).
@@ -89,6 +149,23 @@ Any page error shows a "Something went wrong" screen with Try again (`app/error.
 
 ## Architecture
 
+```mermaid
+flowchart LR
+  U[You, in the browser] --> W[Next.js web app]
+  W <--> DB[(Supabase: Postgres + Auth + RLS)]
+  K[Worker: pnpm worker] <--> DB
+  K --> O[Ollama: Gemma 3 12B]
+  K --> S[SearXNG]
+  K --> G[SerpApi]
+  K --> R[Reddit search JSON / RSS]
+  K --> H[Hacker News Algolia API]
+  V[Visitor clicks a draft link] --> L["/r/code redirect"] --> DB
+```
+
+The web app only reads and writes the database: queue a run, read leads and drafts,
+approve or mark posted. The worker polls the `runs` table, does all model and search work,
+and writes results back.
+
 ```
 app/          Next.js routes (thin). (auth)/sign-in, auth/confirm, projects/,
               projects/[id]/inbox, projects/[id]/runs, r/[code] (tracking redirect),
@@ -132,58 +209,93 @@ Data model (all child tables cascade from `projects`): `projects`, `venues`, `le
 auth.uid()`; child tables check `owns_project(project_id)`. `clicks` is read-only for
 users (written by the service role).
 
-## Setup
+## Setup from zero
 
-Requirements: Node 24+, pnpm 11+, [Ollama](https://ollama.com), a Supabase project.
+Prerequisites: Node 24+, pnpm 11+, [Ollama](https://ollama.com),
+[Docker Desktop](https://www.docker.com/products/docker-desktop/) (for SearXNG), and a free
+[Supabase](https://supabase.com) project. Optional: a [SerpApi](https://serpapi.com) key.
+Gemma 3 12B is an 8 GB download and needs about that much free memory to run.
 
-1. Install dependencies:
+1. Clone and install:
    ```bash
-   pnpm install
+   git clone <this repo> scout && cd scout && pnpm install
    ```
-2. Pull the Gemma models:
+2. Pull the model (8 GB):
    ```bash
    ollama pull gemma3:12b
    ```
-3. Copy `.env.example` to `.env.local` and fill it in. `SUPABASE_URL` and
-   `SUPABASE_ANON_KEY` come from Supabase → Project Settings → API (the legacy
-   `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` names also work).
-   `SUPABASE_SERVICE_ROLE_KEY` is needed for `pnpm seed`.
-4. Apply the migrations in order: paste each file in `supabase/migrations/` into the
-   Supabase SQL editor and run it (or `pnpm dlx supabase db push` with a linked project):
-   `20261021000000_init.sql`, `20261022000000_runs_durations_venue_key.sql`,
-   `20261023000000_venue_why.sql`, then `20261023120000_draft_short_links.sql`.
-5. In Supabase → Authentication → URL Configuration, set Site URL to
-   `http://localhost:3000` and add `http://localhost:3000/auth/confirm` to Redirect URLs.
-6. Run the app and create your account at `/sign-in` (confirm via the email link):
-   ```bash
-   pnpm dev
-   ```
-7. Seed GlamVault for your account:
-   ```bash
-   pnpm seed you@example.com
-   ```
-8. Start SearXNG (Docker Desktop must be running). It listens on `http://localhost:8080`,
-   which is the default `SEARXNG_URL`:
+3. Start SearXNG (listens on `http://localhost:8080`, the default `SEARXNG_URL`):
    ```bash
    docker compose up -d
    ```
-   Check the JSON API: `curl 'http://localhost:8080/search?q=test&format=json'`.
-   For anything beyond local dev, set `SEARXNG_SECRET` in your shell first.
-9. Set `APP_URL` in `.env.local` to the app's public origin (default
-   `http://localhost:3000`); tracking links in drafts point there.
-   Optional: set `SERPAPI_KEY` in `.env.local` (Google results, and the Reddit fallback
-   when Reddit blocks unauthenticated search). Without it SerpApi is skipped.
-10. Start the worker in a second terminal (needs Ollama, SearXNG, and the service role key):
-    ```bash
-    pnpm worker
-    ```
-    Then press **Run now** on a project. Ctrl+C finishes the current run and exits.
+   Check: `curl 'http://localhost:8080/search?q=test&format=json'`. Outside local dev,
+   set `SEARXNG_SECRET` in your shell first.
+4. Copy `.env.example` to `.env.local` and fill it in:
+
+   | Variable | Required | Where it comes from |
+   |---|---|---|
+   | `SUPABASE_URL`, `SUPABASE_ANON_KEY` | yes | Supabase → Project Settings → API (`NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` also work) |
+   | `SUPABASE_SERVICE_ROLE_KEY` | for worker and seed | same page; server only, never exposed to the browser |
+   | `OLLAMA_BASE_URL` | no | default `http://localhost:11434` |
+   | `SCORER_MODEL`, `DRAFTER_MODEL` | no | default `gemma3:12b` |
+   | `SEARXNG_URL` | no | default `http://localhost:8080` |
+   | `APP_URL` | no | public origin for `/r/<code>` tracking links; default `http://localhost:3000` |
+   | `SERPAPI_KEY` | no | serpapi.com; without it SerpApi (and the Reddit fallback) is skipped |
+   | `SEED_USER_EMAIL` | no | default email for `pnpm seed` |
+5. Apply the migrations in order: paste each file in `supabase/migrations/` into the
+   Supabase SQL editor and run it (or `pnpm dlx supabase db push` with a linked project):
+   `20261021000000_init.sql`, `20261022000000_runs_durations_venue_key.sql`,
+   `20261023000000_venue_why.sql`, `20261023120000_draft_short_links.sql`.
+6. In Supabase → Authentication → URL Configuration, set Site URL to
+   `http://localhost:3000` and add `http://localhost:3000/auth/confirm` to Redirect URLs.
+7. Start the app and create your account at `/sign-in` (confirm via the email link):
+   ```bash
+   pnpm dev
+   ```
+8. Add your app at **New project**, or seed the GlamVault example for your account:
+   ```bash
+   pnpm seed you@example.com
+   ```
+9. Start the worker in a second terminal:
+   ```bash
+   pnpm worker
+   ```
+   Press **Run now** on a project and go do nothing. Ctrl+C finishes the current run and
+   exits. If Ollama, the model, or SearXNG is missing, the run fails with a message saying
+   what to start or pull.
 
 Checks:
 
 ```bash
 pnpm lint && pnpm typecheck && pnpm test
 ```
+
+## Known limitations and roadmap
+
+Limitations:
+- **Reddit:** its public JSON search returns 403 from many networks. Scout falls back to
+  RSS (1 request/minute, 5 per run), then to SerpApi.
+- **Speed:** scoring is about 9 s per hit on Gemma 3 12B on a laptop, so a run scoring 150
+  hits takes over 20 minutes.
+- **Undated results:** web results without dates bypass the 30-day rule. Reddit threads
+  get a date estimated from their post id; other sites don't.
+- **Borderline scores:** scores near the thresholds vary between calls, so a borderline
+  post may be kept on one run and dropped on the next.
+- **Spanish:** Spanish drafting is wired up but barely exercised.
+- **Not built:** scheduled runs, clicks per venue on the overview, onboarding auto-fill.
+
+Roadmap:
+- Hosted open-model inference (Gemma on a GPU host) so runs take minutes, not half an hour.
+- More sources: Lemmy, Mastodon, Discourse forums, Stack Exchange, Product Hunt
+  discussions.
+- Weekly schedules, click analytics per venue, auto-fill a project from its URL.
+- Learning from what you approve and reject to tune scoring per project.
+
+## License
+
+[MIT](LICENSE). Gemma models are used under the
+[Gemma Terms of Use](https://ai.google.dev/gemma/terms). See
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Dev log
 
