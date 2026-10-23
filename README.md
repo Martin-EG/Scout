@@ -24,11 +24,16 @@ What works today:
    Zod, retries once, then throws a typed `LLMOutputError`.
 4. **Dev LLM page** at `/dev/llm` (dev only): send a prompt to `SCORER_MODEL`, see the
    reply and latency.
-5. **Run now** (projects page) inserts a `queued` run. Limit: 3 runs per user per UTC day,
-   one active run per project. The runs table under each project polls every 5 s while a
-   run is queued or running, showing hits, leads kept, and plan / search / score times.
-6. **Worker** (`pnpm worker`) polls `runs` every 5 s, claims one queued run at a time, and
-   runs the pipeline:
+5. **Run now** (projects page) inserts a `queued` run. Limit: 3 runs per user per UTC day
+   (failed runs don't count), one active run per project; runs left are shown next to the
+   button. The runs table under each project polls every 5 s while a run is queued or
+   running (hits, leads, plan / search / score / draft times) and hints to start the
+   worker when a run stays queued over 30 s. **Run history** (`/projects/[id]/runs`) lists
+   date, status, duration, the queries used (expandable, with hits and errors per query),
+   hits, leads, and errors.
+6. **Worker** (`pnpm worker`) polls `runs` every 5 s, claims one queued run at a time,
+   checks that Ollama (with the needed models) and SearXNG are up (otherwise the run fails
+   with a message saying what to start or pull), and runs the pipeline:
    - **plan**: `DRAFTER_MODEL` (gemma3:12b) turns the project profile into 10-20 queries,
      English and Spanish, each tagged `reddit`, `hn`, or `web` (falls back to the project's
      keywords if the model fails).
@@ -47,8 +52,7 @@ What works today:
      the 30-day rule. The estimate is only used for filtering; leads store real dates.
      Keyword gate: a hit must contain one of the project's keyword phrases, or two distinct
      keyword words, in its title or snippet (so project keywords now matter).
-   - **score**: `SCORER_MODEL` (default gemma3:4b; gemma3:12b recommended, see Dev log)
-     scores batches of 5 hits: author type
+   - **score**: `SCORER_MODEL` (default gemma3:12b) scores batches of 5 hits: author type
      (person or publisher), relevance and intent (0-10), and a reason. Kept if a person
      wrote it, relevance ≥ 6, and intent ≥ 5. Venues are upserted
      (subreddit, Hacker News, or domain) and leads inserted.
@@ -56,7 +60,11 @@ What works today:
      per run, highest intent first, leads older than 30 days skipped). The reply answers
      the person first, in their language, mentions the app in one or two sentences with a
      disclosure ("I built ..."), and includes the link only if the venue's `link_policy`
-     is `allowed` (otherwise "happy to share the link"). Over 120 words or no disclosure
+     is `allowed` (otherwise "happy to share the link"). Every draft gets a tracking link
+     `/r/<code>`: it logs a click (project, venue, draft, referrer) and redirects to the
+     project URL with `utm_source=<platform>&utm_medium=community&utm_campaign=scout&
+     utm_content=<venue slug>`; a bare project URL in a draft is swapped for it.
+     Over 120 words or no disclosure
      means a retry, then the lead is skipped. Saved as a pending draft; the lead becomes
      `drafted`.
    - **venues**: once per run the drafter suggests up to 8 places without search APIs
@@ -74,13 +82,15 @@ What works today:
    posts anything.
 8. **Overview** on the projects page: new drafts, posted this week, last run time.
 
-Not built yet: UTM short links, schedules.
+Not built yet: schedules, clicks per venue on the overview, onboarding auto-fill.
+Any page error shows a "Something went wrong" screen with Try again (`app/error.tsx`).
 
 ## Architecture
 
 ```
 app/          Next.js routes (thin). (auth)/sign-in, auth/confirm, projects/,
-              projects/[id]/inbox, dev/llm
+              projects/[id]/inbox, projects/[id]/runs, r/[code] (tracking redirect),
+              error.tsx, dev/llm
 components/   ui/ primitives (Button, Field, TagInput); auth/, projects/, runs/, inbox/, dev/
 lib/
   config.ts   env (Zod-validated) + all constants (models, quotas, limits)
@@ -97,8 +107,10 @@ lib/
               403/429 -> SourceBlockedError), rateLimit, venue, dates, text
   scout/      planQueries, search (lanes + reddit fallback), dedupe, redditAge, keywords,
               rules (age, thresholds, skip domains), score, keepLeads, draft,
-              manualVenues, log
+              manualVenues, trackedLink, health (preflight), log
   cooldown.ts venue cooldown rule (7 days)
+  utm.ts      UTM URLs, short codes, project URL -> tracking link
+  links.ts    /r/<code> resolve + click logging (store injected; lib/db/linkStore.ts)
 worker/       index.ts (poll loop, claim, finish/fail), runScout.ts (timed steps)
 searxng/      settings.yml for the SearXNG container (JSON format enabled)
 supabase/
@@ -128,7 +140,7 @@ Requirements: Node 24+, pnpm 11+, [Ollama](https://ollama.com), a Supabase proje
    ```
 2. Pull the Gemma models:
    ```bash
-   ollama pull gemma3:4b && ollama pull gemma3:12b
+   ollama pull gemma3:12b
    ```
 3. Copy `.env.example` to `.env.local` and fill it in. `SUPABASE_URL` and
    `SUPABASE_ANON_KEY` come from Supabase → Project Settings → API (the legacy
@@ -136,8 +148,8 @@ Requirements: Node 24+, pnpm 11+, [Ollama](https://ollama.com), a Supabase proje
    `SUPABASE_SERVICE_ROLE_KEY` is needed for `pnpm seed`.
 4. Apply the migrations in order: paste each file in `supabase/migrations/` into the
    Supabase SQL editor and run it (or `pnpm dlx supabase db push` with a linked project):
-   `20261021000000_init.sql`, `20261022000000_runs_durations_venue_key.sql`, then
-   `20261023000000_venue_why.sql`.
+   `20261021000000_init.sql`, `20261022000000_runs_durations_venue_key.sql`,
+   `20261023000000_venue_why.sql`, then `20261023120000_draft_short_links.sql`.
 5. In Supabase → Authentication → URL Configuration, set Site URL to
    `http://localhost:3000` and add `http://localhost:3000/auth/confirm` to Redirect URLs.
 6. Run the app and create your account at `/sign-in` (confirm via the email link):
@@ -155,7 +167,9 @@ Requirements: Node 24+, pnpm 11+, [Ollama](https://ollama.com), a Supabase proje
    ```
    Check the JSON API: `curl 'http://localhost:8080/search?q=test&format=json'`.
    For anything beyond local dev, set `SEARXNG_SECRET` in your shell first.
-9. Optional: set `SERPAPI_KEY` in `.env.local` (Google results, and the Reddit fallback
+9. Set `APP_URL` in `.env.local` to the app's public origin (default
+   `http://localhost:3000`); tracking links in drafts point there.
+   Optional: set `SERPAPI_KEY` in `.env.local` (Google results, and the Reddit fallback
    when Reddit blocks unauthenticated search). Without it SerpApi is skipped.
 10. Start the worker in a second terminal (needs Ollama, SearXNG, and the service role key):
     ```bash
@@ -331,3 +345,39 @@ Known issues:
 - Manual venue drafts include the bare project link (no link policy for those yet; UTM
   links are day 4).
 - Inbox not checked in a browser while signed in (needs the owner's session).
+
+### 2026-10-23 — Day 4: tracking links, states, run history, second project
+
+Built (Day 4 items 3, 6, 7, 2; skipped 1 schedules, 4 clicks per venue, 5 onboarding):
+- Fix: `createServerSupabase` awaits `connection()`, so `getClaims()`'s `Date.now()` runs
+  at request time (Cache Components logged "unstable value `Date.now()` while
+  prerendering" on every page).
+- Default `SCORER_MODEL` is gemma3:12b (CLAUDE.md, `.env.example` updated).
+- UTM tracking (item 3): `lib/utm.ts`, `lib/links.ts`, `lib/db/linkStore.ts`,
+  `app/r/[code]/route.ts`, `lib/scout/trackedLink.ts`. Migration
+  `20261023120000_draft_short_links.sql` (`drafts.short_code`, unique). `APP_URL` env.
+- States (item 6): service preflight (`lib/scout/health.ts`) in the worker; runs left
+  today next to Run now (failed runs no longer count); "still queued, is the worker
+  running?" hint; empty runs state; `app/error.tsx`.
+- Run history (item 2): `app/projects/[id]/runs`, `components/runs/RunHistoryTable.tsx`.
+- Tests: 87 passing (UTM building, click logging with a fake store, service preflight).
+
+Sloth Roll (item 7): added by script, not through the UI (the app's browser pane had no
+session and Claude in Chrome was not connected). URL is a placeholder,
+`https://example.com/sloth-roll`; set the real one on the edit page.
+Run: 19 queries, 303 hits, 296 unique, 207 on topic, 150 scored (cap), 28 leads, 15
+drafts, 8 venue suggestions / 3 added. plan 56 s, search 4 m 07 s, score 22 m 56 s,
+draft 4 m 26 s. 0 leads shared with GlamVault. All 18 drafts got a short code; the
+manual venue draft's bare URL became `/r/LiBO7wR`. `curl /r/LiBO7wR` returned 302 to
+`…?utm_source=instagram&utm_medium=community&utm_campaign=scout&utm_content=eventplanning`
+and logged a click (project, venue, draft, referrer; test click deleted); unknown and
+malformed codes return 404.
+
+Known issues:
+- Sloth Roll's top leads are mostly other developers launching similar apps ("I built
+  an app that sorts screenshots"), scored 10/10. The scorer reads a launch post as
+  intent. Competitor launches need their own rule or prompt line.
+- The keyword gate is loose for Sloth Roll (207 of 296 on topic): its keywords use
+  common words (screenshot, calendar, save). Scoring 150 hits on 12b took 23 minutes.
+- Drafts created before the migration have no tracking link.
+- Inbox buttons (Approve, Mark posted, cooldown) are still unexercised against real data.
