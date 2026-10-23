@@ -58,7 +58,7 @@ export async function scoreHits(
       const result = await llm.completeJSON(
         scorePrompt(project, batch, { snippetChars: SCOUT.scoreSnippetChars }),
         scoreBatchSchema,
-        { model, system: SCORE_SYSTEM, temperature: SCOUT.scorerTemperature },
+        { model, system: SCORE_SYSTEM, temperature: SCOUT.scorerTemperature, timeoutMs: SCOUT.scorerTimeoutMs },
       );
       const matched = matchScores(batch, result.results);
       stats.unmatched += batch.length - matched.length;

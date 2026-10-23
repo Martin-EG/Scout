@@ -62,7 +62,7 @@ export function RunPanel({ projectId, initialRuns, startRun, getRuns }: RunPanel
               <th className="py-1 pr-3 font-medium">Status</th>
               <th className="py-1 pr-3 font-medium">Hits</th>
               <th className="py-1 pr-3 font-medium">Leads</th>
-              <th className="py-1 font-medium">Plan / search / score</th>
+              <th className="py-1 font-medium">Plan / search / score / draft</th>
             </tr>
           </thead>
           <tbody>
@@ -83,7 +83,12 @@ export function RunPanel({ projectId, initialRuns, startRun, getRuns }: RunPanel
                 <td className="py-1 pr-3">{run.leads_kept}</td>
                 <td className="py-1">
                   {formatDuration(run.step_durations.plan)} / {formatDuration(run.step_durations.search)} /{" "}
-                  {formatDuration(run.step_durations.score)}
+                  {formatDuration(run.step_durations.score)} /{" "}
+                  {formatDuration(
+                    run.step_durations.draft === undefined
+                      ? undefined
+                      : run.step_durations.draft + (run.step_durations.venues ?? 0),
+                  )}
                 </td>
               </tr>
             ))}

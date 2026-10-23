@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { DeleteProjectButton } from "@/components/projects/DeleteProjectButton";
+import { ProjectStats } from "@/components/projects/ProjectStats";
 import { RunPanel } from "@/components/runs/RunPanel";
 import { buttonClass } from "@/components/ui/Button";
 import { requireUser } from "@/lib/db/auth";
+import { getProjectOverview } from "@/lib/db/inbox";
 import { listProjects } from "@/lib/db/projects";
 import { listRecentRuns } from "@/lib/db/runs";
 import { getRecentRuns, removeProject, startRun } from "./actions";
@@ -13,7 +15,10 @@ export const metadata = { title: "Projects · Scout" };
 async function ProjectList() {
   await requireUser();
   const projects = await listProjects();
-  const runs = await Promise.all(projects.map((project) => listRecentRuns(project.id)));
+  const [runs, overviews] = await Promise.all([
+    Promise.all(projects.map((project) => listRecentRuns(project.id))),
+    Promise.all(projects.map((project) => getProjectOverview(project.id))),
+  ]);
 
   if (projects.length === 0) {
     return (
@@ -42,6 +47,7 @@ async function ProjectList() {
                 {project.description}
               </p>
             )}
+            <ProjectStats overview={overviews[i]} />
             <RunPanel
               projectId={project.id}
               initialRuns={runs[i]}
@@ -50,8 +56,8 @@ async function ProjectList() {
             />
           </div>
           <div className="flex shrink-0 items-center gap-3">
-            <Link href={`/projects/${project.id}/leads`} className="text-sm hover:underline">
-              Leads
+            <Link href={`/projects/${project.id}/inbox`} className="text-sm hover:underline">
+              Inbox
             </Link>
             <Link href={`/projects/${project.id}/edit`} className="text-sm hover:underline">
               Edit

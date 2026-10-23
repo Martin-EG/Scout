@@ -13,7 +13,7 @@ export type RunSummary = Pick<
 > & { step_durations: StepDurations };
 
 const durationsSchema = z
-  .object({ plan: z.number(), search: z.number(), score: z.number() })
+  .object({ plan: z.number(), search: z.number(), score: z.number(), draft: z.number(), venues: z.number() })
   .partial()
   .catch({});
 

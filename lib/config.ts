@@ -93,6 +93,8 @@ export const SCOUT = {
   /** The 12b planner can need >2 min on a cold start (model load + ~20 queries). */
   plannerTimeoutMs: 300_000,
   scorerTemperature: 0.1,
+  /** Per batch. gemma3:12b needs ~50 s for 5 hits, more under load; 4b far less. */
+  scorerTimeoutMs: 240_000,
   /**
    * Reddit post ids are base-36 and increase with time. Undated Reddit hits get a date
    * from a line fit through the run's dated Reddit posts; these anchors (observed
@@ -116,6 +118,28 @@ export const SCOUT = {
   undatedSocialDomains: ["tiktok.com", "instagram.com", "youtube.com", "youtu.be"],
   /** Facebook paths that are videos or reels (group posts stay). */
   facebookVideoPath: /\/(videos|reel|watch)\b/,
+} as const;
+
+export const DRAFTS = {
+  /** Leads drafted per run, highest intent first (includes earlier undrafted leads). */
+  maxPerRun: 15,
+  /** Undrafted leads fetched per run before the age check trims them to maxPerRun. */
+  candidatesPerRun: 60,
+  maxWords: 120,
+  temperature: 0.6,
+  /** Manual venue suggestions per run (platforms without search APIs). */
+  manualVenuesMax: 8,
+  /** link_policy values that allow a link in the reply. Anything else (or none) means no link. */
+  linkAllowedPolicies: ["allowed", "links allowed", "yes"],
+  /**
+   * Phrases that count as the disclosure, matched on lowercase accent-free text.
+   * A draft without one is rejected and retried.
+   */
+  disclosureMarkers: [
+    "i built", "i made", "i created", "i developed", "i m building", "i am building", "i m the dev",
+    "lo hice", "la hice", "lo cree", "la cree", "lo construi", "la construi", "lo desarrolle",
+    "la desarrolle", "estoy construyendo", "soy la desarrolladora", "soy el desarrollador",
+  ],
 } as const;
 
 export const WORKER = {

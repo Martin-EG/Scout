@@ -1,12 +1,15 @@
-// One scout run: plan -> search -> dedupe -> score -> keep. Each step is timed.
+// One scout run: plan -> search -> dedupe -> score -> keep -> draft -> manual venues. Each step is timed.
 import type { LLMProvider } from "@/lib/llm";
-import { getLeadUrls, type ServiceSupabase } from "@/lib/db/scoutStore";
+import { DRAFTS } from "@/lib/config";
+import { getLeadUrls, listLeadsToDraft, type ServiceSupabase } from "@/lib/db/scoutStore";
 import type { RunOutcome } from "@/lib/db/runQueue";
 import type { Sources } from "@/lib/sources";
 import { dedupeHits, normalizeUrl } from "@/lib/scout/dedupe";
+import { draftLeads, selectLeadsToDraft } from "@/lib/scout/draft";
 import { keepLeads } from "@/lib/scout/keepLeads";
 import { buildKeywordIndex, matchesKeywords } from "@/lib/scout/keywords";
 import { errorMessage, log, type LogContext } from "@/lib/scout/log";
+import { suggestManualVenues } from "@/lib/scout/manualVenues";
 import { planQueries } from "@/lib/scout/planQueries";
 import { estimateRedditDates } from "@/lib/scout/redditAge";
 import { applyScoreRules, isSkippedDomain, isUndatedSocialVideo, selectHitsToScore } from "@/lib/scout/rules";
@@ -18,7 +21,7 @@ export interface ScoutDeps {
   supabase: ServiceSupabase;
   llm: LLMProvider;
   sources: Sources;
-  models: { planner: string; scorer: string };
+  models: { planner: string; scorer: string; drafter: string };
   now?: () => number;
 }
 
@@ -86,6 +89,18 @@ export async function runScout(project: Project, runId: string, deps: ScoutDeps)
     const kept = applyScoreRules(scored, now());
     outcome.leadsKept = await keepLeads(deps.supabase, { projectId: project.id, runId }, kept);
     log.info("scored", { ...ctx, ...stats, scored: scored.length, kept: kept.length, stored: outcome.leadsKept });
+
+    const drafts = await step("draft", async () => {
+      const candidates = await listLeadsToDraft(deps.supabase, project.id, DRAFTS.candidatesPerRun);
+      const leads = selectLeadsToDraft(candidates, now());
+      return draftLeads(deps.llm, deps.models.drafter, deps.supabase, project, leads, ctx);
+    });
+    log.info("drafted", { ...ctx, ...drafts });
+
+    const venues = await step("venues", () =>
+      suggestManualVenues(deps.llm, deps.models.drafter, deps.supabase, project, ctx),
+    );
+    log.info("manual venues", { ...ctx, ...venues });
 
     return {
       queries: outcome.queries,

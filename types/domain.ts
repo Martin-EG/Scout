@@ -31,6 +31,8 @@ export type Venue = {
   rules: string | null;
   link_policy: string | null;
   fit_score: number | null;
+  /** Why the venue fits the project (manual venues). */
+  why: string | null;
   status: VenueStatus;
   last_posted_at: string | null;
 };
@@ -80,7 +82,7 @@ export type Run = {
   created_at: string;
 };
 
-export type RunStep = "plan" | "search" | "score";
+export type RunStep = "plan" | "search" | "score" | "draft" | "venues";
 export type StepDurations = Partial<Record<RunStep, number>>;
 
 export type Click = {

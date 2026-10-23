@@ -52,32 +52,53 @@ What works today:
      (person or publisher), relevance and intent (0-10), and a reason. Kept if a person
      wrote it, relevance ≥ 6, and intent ≥ 5. Venues are upserted
      (subreddit, Hacker News, or domain) and leads inserted.
+   - **draft**: `DRAFTER_MODEL` (gemma3:12b) writes one reply per undrafted lead (up to 15
+     per run, highest intent first, leads older than 30 days skipped). The reply answers
+     the person first, in their language, mentions the app in one or two sentences with a
+     disclosure ("I built ..."), and includes the link only if the venue's `link_policy`
+     is `allowed` (otherwise "happy to share the link"). Over 120 words or no disclosure
+     means a retry, then the lead is skipped. Saved as a pending draft; the lead becomes
+     `drafted`.
+   - **venues**: once per run the drafter suggests up to 8 places without search APIs
+     (TikTok/Instagram hashtags, YouTube niches, Facebook group types, newsletters), each
+     with why and a caption or outreach message. New names only; stored as manual venues
+     with a pending draft.
    - The run row gets `queries` (each with where it ran, hit count, errors), `hits_found`,
-     `leads_kept`, `step_durations`, and `done` or `failed` with the error.
-7. **Leads** (`/projects/[id]/leads`, temporary): open leads sorted by intent then
-   relevance, with source, venue, scores, reason, link, and a Dismiss button.
+     `leads_kept`, `step_durations` (plan, search, score, draft, venues), and `done` or
+     `failed` with the error.
+7. **Inbox** (`/projects/[id]/inbox`): tabs Leads, Manual venues, Posted, Rejected. Each
+   card shows the thread link, source, venue, scores, reason, venue rules, and the draft
+   in an editable textarea. Copy copies the edited text; Approve, Mark posted (stamps the
+   draft's `posted_at` and the venue's `last_posted_at`), and Reject save the edited
+   text. A card warns when its venue was posted in within the last 7 days. Scout never
+   posts anything.
+8. **Overview** on the projects page: new drafts, posted this week, last run time.
 
-Not built yet: drafts, the inbox, manual venues, venue cooldown warnings, UTM redirects.
+Not built yet: UTM short links, schedules.
 
 ## Architecture
 
 ```
-app/          Next.js routes (thin). (auth)/sign-in, auth/confirm, projects/, dev/llm
-components/   ui/ primitives (Button, Field, TagInput); auth/, projects/, dev/ features
+app/          Next.js routes (thin). (auth)/sign-in, auth/confirm, projects/,
+              projects/[id]/inbox, dev/llm
+components/   ui/ primitives (Button, Field, TagInput); auth/, projects/, runs/, inbox/, dev/
 lib/
   config.ts   env (Zod-validated) + all constants (models, quotas, limits)
   db/         Supabase clients: server (cookies), browser, service (service role);
               auth.ts (getSessionUser/requireUser), session.ts (proxy refresh),
               projects.ts (queries), projectInput.ts (form schema),
   llm/        LLMProvider interface, OllamaProvider, extractJSON, typed errors
-              runs.ts, leads.ts (user queries, RLS); runQueue.ts, scoutStore.ts
+              runs.ts, inbox.ts (user queries, RLS); runQueue.ts, scoutStore.ts
               (worker, service role)
   llm/        LLMProvider interface, OllamaProvider, extractJSON, typed errors;
-              prompts/ (profile, planQueries, score), schemas/ (queryPlan, score)
+              prompts/ (profile, planQueries, score, draft, manualVenues),
+              schemas/ (queryPlan, score, draft)
   sources/    reddit, hackernews, searxng, serpapi adapters -> Hit; http (UA, timeout,
               403/429 -> SourceBlockedError), rateLimit, venue, dates, text
-  scout/      planQueries, search (lanes + reddit fallback), dedupe, rules (age,
-              thresholds, skip domains), score, keepLeads, log
+  scout/      planQueries, search (lanes + reddit fallback), dedupe, redditAge, keywords,
+              rules (age, thresholds, skip domains), score, keepLeads, draft,
+              manualVenues, log
+  cooldown.ts venue cooldown rule (7 days)
 worker/       index.ts (poll loop, claim, finish/fail), runScout.ts (timed steps)
 searxng/      settings.yml for the SearXNG container (JSON format enabled)
 supabase/
@@ -115,7 +136,8 @@ Requirements: Node 24+, pnpm 11+, [Ollama](https://ollama.com), a Supabase proje
    `SUPABASE_SERVICE_ROLE_KEY` is needed for `pnpm seed`.
 4. Apply the migrations in order: paste each file in `supabase/migrations/` into the
    Supabase SQL editor and run it (or `pnpm dlx supabase db push` with a linked project):
-   `20261021000000_init.sql`, then `20261022000000_runs_durations_venue_key.sql`.
+   `20261021000000_init.sql`, `20261022000000_runs_durations_venue_key.sql`, then
+   `20261023000000_venue_why.sql`.
 5. In Supabase → Authentication → URL Configuration, set Site URL to
    `http://localhost:3000` and add `http://localhost:3000/auth/confirm` to Redirect URLs.
 6. Run the app and create your account at `/sign-in` (confirm via the email link):
@@ -273,3 +295,39 @@ Known issues:
 - Leads stored before the `tl` fix keep their duplicates.
 - The keyword gate can drop real leads whose snippet is cut short (a Facebook group
   question with only "inventory" in its snippet).
+
+### 2026-10-23 — Day 3 (cont.): drafts, manual venues, inbox
+
+Built:
+- Undated TikTok, Instagram, YouTube, and Facebook video/reel hits are dropped before
+  scoring (`isUndatedSocialVideo`, `SCOUT.undatedSocialDomains`).
+- `lib/scout/draft.ts` + `lib/llm/prompts/draft.ts`: one draft per lead, product rules
+  enforced in the schema (`checkedDraftSchema`: ≤ 120 words, disclosure phrase in EN or
+  ES), `linkPolicyAllowsLinks` (only an explicit `allowed`). Stale leads skipped by stored
+  or estimated Reddit date (`selectLeadsToDraft`).
+- `lib/scout/manualVenues.ts` + prompt: up to 8 suggestions, new names only, drafts must
+  pass the same rules. Migration `20261023000000_venue_why.sql` (`venues.why`).
+- `worker/runScout.ts`: draft and venues steps, timed.
+- Inbox (`app/projects/[id]/inbox`, `components/inbox/InboxCard.tsx`,
+  `lib/db/inbox.ts`), cooldown (`lib/cooldown.ts`), overview counts
+  (`components/projects/ProjectStats.tsx`). The temporary leads page is gone.
+- `SCOUT.scorerTimeoutMs` (240 s per batch).
+- Tests: 74 passing (draft schema, disclosure, link policy in the prompt, cooldown,
+  manual venue selection, stale-lead skip, social filter).
+
+Run 5 (GlamVault, gemma3:12b scorer and drafter): 282 hits, 245 unique, 66 on topic, 50
+to score, 3 batches timed out (a `pnpm build` ran at the same time), 3 new leads. 15
+drafts (0 failed), 8 venue suggestions, 5 added. plan 60 s, search 4 m 13 s, score
+14 m 58 s, draft 5 m 10 s, venues 1 m 47 s, total 27 m 10 s.
+Every draft passed the rules (38-110 words, disclosure, no link on leads). Drafts on
+real threads read well (answer first, one or two sentences about GlamVault).
+
+Known issues:
+- 13 of the 15 drafts went to backlog leads, including run 1-2 junk (r/ClaudeCode,
+  r/mealime, competitor sites legendaryhall.shop and shadey.app, the r/nobuy landing
+  page). Reject them in the inbox.
+- No Spanish leads were fresh enough to draft, so Spanish lead drafts are untested.
+  The one Spanish manual venue draft came out half in English.
+- Manual venue drafts include the bare project link (no link policy for those yet; UTM
+  links are day 4).
+- Inbox not checked in a browser while signed in (needs the owner's session).

@@ -23,7 +23,7 @@ export type Database = {
       projects: Table<Project, "id" | "created_at" | "user_id">;
       venues: Table<
         Venue,
-        "id" | "url" | "rules" | "link_policy" | "fit_score" | "status" | "last_posted_at"
+        "id" | "url" | "rules" | "link_policy" | "fit_score" | "why" | "status" | "last_posted_at"
       >;
       leads: Table<
         Lead,
