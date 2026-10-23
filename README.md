@@ -53,8 +53,10 @@ What works today:
      Keyword gate: a hit must contain one of the project's keyword phrases, or two distinct
      keyword words, in its title or snippet (so project keywords now matter).
    - **score**: `SCORER_MODEL` (default gemma3:12b) scores batches of 5 hits: author type
-     (person or publisher), relevance and intent (0-10), and a reason. Kept if a person
-     wrote it, relevance ≥ 6, and intent ≥ 5. Venues are upserted
+     (person or publisher), `self_promo` (the author is showing or launching something they
+     made), relevance and intent (0-10), and a reason. Kept if a person wrote it, it is not
+     self-promotion (scorer flag, or a launch title such as "I built an app…", "Show HN",
+     "hice una app": `SCOUT.launchTitlePatterns`), relevance ≥ 6, and intent ≥ 5. Venues are upserted
      (subreddit, Hacker News, or domain) and leads inserted.
    - **draft**: `DRAFTER_MODEL` (gemma3:12b) writes one reply per undrafted lead (up to 15
      per run, highest intent first, leads older than 30 days skipped). The reply answers
@@ -374,10 +376,31 @@ and logged a click (project, venue, draft, referrer; test click deleted); unknow
 malformed codes return 404.
 
 Known issues:
-- Sloth Roll's top leads are mostly other developers launching similar apps ("I built
-  an app that sorts screenshots"), scored 10/10. The scorer reads a launch post as
-  intent. Competitor launches need their own rule or prompt line.
+- (Fixed below) Sloth Roll's top leads were mostly other developers launching similar
+  apps ("I built an app that sorts screenshots"), scored 10/10.
 - The keyword gate is loose for Sloth Roll (207 of 296 on topic): its keywords use
   common words (screenshot, calendar, save). Scoring 150 hits on 12b took 23 minutes.
 - Drafts created before the migration have no tracking link.
 - Inbox buttons (Approve, Mark posted, cooldown) are still unexercised against real data.
+
+### 2026-10-23 — Day 4 (cont.): competitor launch posts
+
+Built:
+- Scorer field `self_promo` (prompt: an author showing, launching, or asking feedback on
+  something they made is a competitor, not a user; intent 0) and a deterministic launch
+  title rule (`isLaunchTitle`, EN + ES patterns). Either one drops the hit.
+- Tests: 91 passing (launch titles from real leads, both directions; lenient flag parsing).
+
+Rescore of stored leads with gemma3:12b and the new rules (age rule ignored):
+- Sloth Roll, 28 leads (all kept before), 27 scored: 8 kept, 19 dropped as self-promotion
+  (12 by both signals, 6 by `self_promo` only, 1 by the title only). The flag alone
+  caught product posts with no launch phrasing ("Cosas - a place for everything you save",
+  "DoubleMemory 3.2", a Reminders shortcut). Still kept but weak: a Facebook "Recall"
+  post that reads like an ad, and an off-topic r/grok help thread.
+- GlamVault run 3, 30 leads, 29 scored: 0 dropped as self-promotion; 24 kept, 5 dropped
+  on score (intent 4, borderline posts; scores near the threshold vary between calls).
+- 4.5-5 minutes per 30 leads on gemma3:12b.
+
+Known issues:
+- Leads and drafts stored before this change keep their old status; Sloth Roll's inbox
+  still has drafts for competitor launch posts. Reject them there.

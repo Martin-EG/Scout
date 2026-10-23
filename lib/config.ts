@@ -126,6 +126,19 @@ export const SCOUT = {
    * least this many distinct keyword words, before it reaches the scorer.
    */
   minKeywordTokenOverlap: 2,
+  /**
+   * Titles that announce the author's own product (matched on lowercase accent-free
+   * text). These posters are competitors, not users: dropped after scoring.
+   */
+  launchTitlePatterns: [
+    /\b(i|we)( just| finally)? (built|made|created|developed|launched|shipped|coded)\b/,
+    /\bso i (built|made|created)\b/,
+    /\b(built|made|created|building) (an|a|my) (ios |iphone |android |mac |web )?(app|tool|shortcut)\b/,
+    /\btry my (new )?(ios |iphone |android )?(app|tool)\b/,
+    /^show hn\b/,
+    /\b(hice|cree|arme|desarrolle|lance) (una|mi) (app|aplicacion|herramienta)\b/,
+    /\b(arme|hice|cree) una alternativa\b/,
+  ],
   /** Listing pages, never conversations: dropped before scoring (the project's own domain is too). */
   skipDomains: ["apps.apple.com", "play.google.com", "chromewebstore.google.com", "producthunt.com"],
   /**

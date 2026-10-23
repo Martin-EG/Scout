@@ -3,6 +3,7 @@ import {
   applyScoreRules,
   isSkippedDomain,
   isTooOld,
+  isLaunchTitle,
   isUndatedSocialVideo,
   passesScoreRules,
   selectHitsToScore,
@@ -27,6 +28,7 @@ const base: Hit = {
 const scored = (over: Partial<ScoredHit>): ScoredHit => ({
   ...base,
   authorType: "person",
+  selfPromo: false,
   relevance: 8,
   intent: 8,
   reason: "r",
@@ -37,6 +39,11 @@ const scored = (over: Partial<ScoredHit>): ScoredHit => ({
 describe("score rules", () => {
   it("keeps hits at exactly the thresholds", () => {
     expect(passesScoreRules(scored({ relevance: 6, intent: 5 }), NOW, T)).toBe(true);
+  });
+
+  it("drops authors promoting their own product, by scorer flag or launch title", () => {
+    expect(passesScoreRules(scored({ selfPromo: true }), NOW, T)).toBe(false);
+    expect(passesScoreRules(scored({ title: "I built an app that sorts screenshots" }), NOW, T)).toBe(false);
   });
 
   it("drops pages written by publishers", () => {
@@ -90,11 +97,19 @@ describe("matchScores", () => {
       {
         url: "https://old.reddit.com/r/x/comments/1/t/",
         author_type: "person",
+        self_promo: false,
         relevance: 7,
         intent: 6,
         reason: "asks for an app",
       },
-      { url: "https://made-up.example/", author_type: "person", relevance: 9, intent: 9, reason: "hallucinated" },
+      {
+        url: "https://made-up.example/",
+        author_type: "person",
+        self_promo: false,
+        relevance: 9,
+        intent: 9,
+        reason: "hallucinated",
+      },
     ]);
     expect(out).toHaveLength(1);
     expect(out[0]).toMatchObject({ url: base.url, authorType: "person", relevance: 7, intent: 6 });
@@ -154,5 +169,49 @@ describe("isUndatedSocialVideo", () => {
     );
     expect(isUndatedSocialVideo({ url: "https://www.reddit.com/r/x/comments/1/t" })).toBe(false);
     expect(isUndatedSocialVideo({ url: "https://notyoutube.com/watch" })).toBe(false);
+  });
+});
+
+describe("isLaunchTitle", () => {
+  // Real Sloth Roll / GlamVault lead titles from run 6 and run 2.
+  it("flags launch and self-promo titles in English and Spanish", () => {
+    for (const title of [
+      "I saved 2,500+ posts but opened a handful. So we spent ~2 months building an iPhone app th",
+      "I don’t know how to organize 30,000 photos on my iPhone, so I built an app to make organizing",
+      "I built an iPhone app that automatically sorts screenshots and temporary photos",
+      "iPhone storage fills up with screenshots and near-duplicate shots — I made a cleanup app",
+      "Looking for 20 people with messy camera rolls to try my iOS app for free",
+      "built an app for the things I want to remember that don't belong in Notes or Photos",
+      "I launched a photo cleaner app with no servers, no ads and no weekly subscription",
+      "Made an app for tracking your makeup collection ...",
+      "Hice una app para no olvidar cuándo te cobran Netflix, Spotify y compañía",
+      "Cansado de que las apps de bondis anden mal, armé una alternativa para Rosario",
+      "Show HN: Screenshot to calendar",
+    ]) {
+      expect(isLaunchTitle(title), title).toBe(true);
+    }
+  });
+
+  it("keeps people asking for help", () => {
+    for (const title of [
+      "the digital clutter is so bad i wanna buy another phone to start fresh",
+      "Is there an app to track my makeup collection?",
+      "Deleting thousands of old phone screenshots gave me unexpected mental relief",
+      "I might have a lipstick problem. Pls be voice of the reason?",
+      "My app keeps crashing when I take screenshots",
+      "¿Usas alguna app para llevar un control de tu inventario de maquillaje?",
+    ]) {
+      expect(isLaunchTitle(title), title).toBe(false);
+    }
+  });
+
+  it("reads self_promo flags leniently", () => {
+    const parse = (self_promo: unknown) =>
+      scoreBatchSchema.parse({ results: [{ url: "a", author_type: "person", self_promo, relevance: 5, intent: 5 }] })
+        .results[0].self_promo;
+    expect(parse(true)).toBe(true);
+    expect(parse("Yes")).toBe(true);
+    expect(parse("no")).toBe(false);
+    expect(parse(undefined)).toBe(false);
   });
 });

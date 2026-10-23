@@ -1,5 +1,6 @@
 import { SCOUT } from "@/lib/config";
 import type { Hit } from "@/types/domain";
+import { normalizeText } from "./keywords";
 
 const DAY_MS = 86_400_000;
 
@@ -17,6 +18,8 @@ export const DEFAULT_THRESHOLDS: ScoreThresholds = {
 
 export interface ScoredHit extends Hit {
   authorType: "person" | "publisher";
+  /** The scorer says the author is promoting something they made. */
+  selfPromo: boolean;
   relevance: number;
   intent: number;
   reason: string;
@@ -29,13 +32,21 @@ export function isTooOld(hit: Pick<Hit, "postedAt">, now: number, maxAgeDays: nu
   return !Number.isNaN(posted) && now - posted > maxAgeDays * DAY_MS;
 }
 
+/** True when the title announces the author's own app or product ("I built…", "Show HN"). */
+export function isLaunchTitle(title: string): boolean {
+  const text = normalizeText(title);
+  return SCOUT.launchTitlePatterns.some((pattern) => pattern.test(text));
+}
+
 /**
- * Keep a scored hit only if a person wrote it (not a brand, blog, or store), it is
- * recent enough, relevant enough, and shows enough intent.
+ * Keep a scored hit only if a person wrote it (not a brand, blog, or store), they
+ * are not promoting their own product, and it is recent, relevant, and shows intent.
  */
 export function passesScoreRules(hit: ScoredHit, now: number, t: ScoreThresholds = DEFAULT_THRESHOLDS): boolean {
   return (
     hit.authorType === "person" &&
+    !hit.selfPromo &&
+    !isLaunchTitle(hit.title) &&
     !isTooOld(hit, now, t.maxAgeDays) &&
     hit.relevance >= t.minRelevance &&
     hit.intent >= t.minIntent

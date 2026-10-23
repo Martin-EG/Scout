@@ -30,6 +30,7 @@ export function matchScores(batch: Hit[], scores: HitScore[]): ScoredHit[] {
     out.push({
       ...hit,
       authorType: score.author_type,
+      selfPromo: score.self_promo,
       relevance: score.relevance,
       intent: score.intent,
       reason: score.reason.slice(0, SCOUT.reasonChars),

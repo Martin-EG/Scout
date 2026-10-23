@@ -8,9 +8,16 @@ const authorType = z.preprocess(
   z.enum(["person", "publisher"]).catch("publisher"),
 );
 
+/** "true"/"yes" strings count as true; anything unreadable as false (the title rule backs it up). */
+const flag = z.preprocess(
+  (value) => (typeof value === "string" ? /^(true|yes)$/i.test(value.trim()) : value),
+  z.boolean().catch(false),
+);
+
 export const hitScoreSchema = z.object({
   url: z.string().trim().min(1),
   author_type: authorType,
+  self_promo: flag.default(false),
   relevance: score,
   intent: score,
   reason: z.string().trim().default(""),
