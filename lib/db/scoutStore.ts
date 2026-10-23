@@ -63,7 +63,7 @@ export async function insertLeads(supabase: ServiceSupabase, rows: LeadInsert[])
 }
 
 export type LeadToDraft = Pick<Lead, "id" | "title" | "snippet" | "url" | "source" | "posted_at" | "intent_score"> & {
-  venue: Pick<Venue, "id" | "name" | "rules" | "link_policy"> | null;
+  venue: Pick<Venue, "id" | "name" | "platform" | "rules" | "link_policy"> | null;
 };
 
 /** Leads still waiting for a draft (status new), highest intent first. */
@@ -87,7 +87,7 @@ export async function listLeadsToDraft(
   if (venueIds.length > 0) {
     const { data, error: venueError } = await supabase
       .from("venues")
-      .select("id, name, rules, link_policy")
+      .select("id, name, platform, rules, link_policy")
       .in("id", venueIds);
     if (venueError) throw new Error(`listLeadsToDraft venues failed (project ${projectId}): ${venueError.message}`);
     for (const venue of data) venues.set(venue.id, venue);
@@ -100,12 +100,31 @@ export async function listLeadsToDraft(
 
 export type DraftInsert = Database["public"]["Tables"]["drafts"]["Insert"];
 
-/** Saves a lead's draft and marks the lead drafted. */
-export async function saveLeadDraft(supabase: ServiceSupabase, draft: DraftInsert & { lead_id: string }) {
-  const { error } = await supabase.from("drafts").insert(draft);
-  if (error) throw new Error(`saveLeadDraft insert failed (lead ${draft.lead_id}): ${error.message}`);
-  const { error: leadError } = await supabase.from("leads").update({ status: "drafted" }).eq("id", draft.lead_id);
-  if (leadError) throw new Error(`saveLeadDraft lead update failed (lead ${draft.lead_id}): ${leadError.message}`);
+const UNIQUE_VIOLATION = "23505";
+
+/**
+ * Inserts a draft with a fresh short code, retrying on the (rare) code collision.
+ * `build` gets the code so the body and link can use it.
+ */
+export async function insertDraftWithCode(
+  supabase: ServiceSupabase,
+  build: (code: string) => DraftInsert,
+  newCode: () => string,
+  attempts: number,
+): Promise<void> {
+  for (let attempt = 1; ; attempt++) {
+    const draft = build(newCode());
+    const { error } = await supabase.from("drafts").insert(draft);
+    if (!error) return;
+    if (error.code !== UNIQUE_VIOLATION || attempt >= attempts) {
+      throw new Error(`draft insert failed (project ${draft.project_id}): ${error.message}`);
+    }
+  }
+}
+
+export async function markLeadDrafted(supabase: ServiceSupabase, leadId: string) {
+  const { error } = await supabase.from("leads").update({ status: "drafted" }).eq("id", leadId);
+  if (error) throw new Error(`markLeadDrafted failed (lead ${leadId}): ${error.message}`);
 }
 
 /** Lowercased names of every venue the project already has (any kind). */
@@ -119,17 +138,15 @@ export interface ManualVenueInsert {
   platform: string;
   name: string;
   why: string;
-  draft: string;
-  language: string;
 }
 
-/** Inserts manual venues and one pending draft each. Returns how many venues were added. */
+/** Inserts manual venues (skipping existing names). Returns the rows actually added. */
 export async function insertManualVenues(
   supabase: ServiceSupabase,
   projectId: string,
   venues: ManualVenueInsert[],
-): Promise<number> {
-  if (venues.length === 0) return 0;
+): Promise<Pick<Venue, "id" | "platform" | "name">[]> {
+  if (venues.length === 0) return [];
   const { data, error } = await supabase
     .from("venues")
     .upsert(
@@ -138,17 +155,5 @@ export async function insertManualVenues(
     )
     .select("id, platform, name");
   if (error) throw new Error(`insertManualVenues failed (project ${projectId}): ${error.message}`);
-
-  const byKey = new Map(venues.map((v) => [venueKey(v.platform, v.name), v]));
-  const drafts = data.flatMap((row) => {
-    const venue = byKey.get(venueKey(row.platform, row.name));
-    return venue
-      ? [{ project_id: projectId, venue_id: row.id, body: venue.draft, language: venue.language }]
-      : [];
-  });
-  if (drafts.length > 0) {
-    const { error: draftError } = await supabase.from("drafts").insert(drafts);
-    if (draftError) throw new Error(`insertManualVenues drafts failed (project ${projectId}): ${draftError.message}`);
-  }
-  return data.length;
+  return data;
 }

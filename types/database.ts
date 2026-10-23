@@ -40,7 +40,7 @@ export type Database = {
       >;
       drafts: Table<
         Draft,
-        "id" | "lead_id" | "venue_id" | "language" | "status" | "utm_url" | "posted_at" | "created_at"
+        "id" | "lead_id" | "venue_id" | "language" | "status" | "utm_url" | "short_code" | "posted_at" | "created_at"
       >;
       runs: Table<
         WithJsonQueries<Run>,

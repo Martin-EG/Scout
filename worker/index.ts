@@ -43,7 +43,12 @@ async function processNext(deps: Omit<ScoutDeps, "sources">): Promise<boolean> {
 async function main() {
   const supabase = createServiceSupabase();
   const models = getModels();
-  const deps = { supabase, llm: createLLMProvider(), models: { planner: models.drafter, scorer: models.scorer, drafter: models.drafter } };
+  const deps = {
+    supabase,
+    llm: createLLMProvider(),
+    models: { planner: models.drafter, scorer: models.scorer, drafter: models.drafter },
+    appUrl: getEnv().APP_URL,
+  };
 
   const stale = await failStaleRuns(supabase, "Worker restarted while this run was in progress.");
   if (stale > 0) console.warn(`[worker] marked ${stale} stale running run(s) as failed`);

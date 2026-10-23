@@ -1,10 +1,11 @@
 import { DRAFTS } from "@/lib/config";
-import { insertManualVenues, listVenueNames, type ServiceSupabase } from "@/lib/db/scoutStore";
+import { insertDraftWithCode, insertManualVenues, listVenueNames, type ServiceSupabase } from "@/lib/db/scoutStore";
 import type { LLMProvider } from "@/lib/llm";
 import { MANUAL_VENUES_SYSTEM, manualVenuesPrompt } from "@/lib/llm/prompts/manualVenues";
 import { manualVenuesSchema, type ManualVenueOutput } from "@/lib/llm/schemas/draft";
 import type { Project } from "@/types/domain";
 import { draftProblems } from "./draft";
+import { codeSequence, SHORT_CODE_ATTEMPTS, trackedDraftFields } from "./trackedLink";
 import { errorMessage, log, type LogContext } from "./log";
 
 /**
@@ -29,6 +30,7 @@ export async function suggestManualVenues(
   model: string,
   supabase: ServiceSupabase,
   project: Project,
+  appUrl: string,
   ctx: LogContext,
 ): Promise<{ suggested: number; added: number }> {
   try {
@@ -39,8 +41,24 @@ export async function suggestManualVenues(
       temperature: DRAFTS.temperature,
     });
     const fresh = selectNewVenues(result.venues, existing);
-    const added = await insertManualVenues(supabase, project.id, fresh);
-    return { suggested: result.venues.length, added };
+    const rows = await insertManualVenues(supabase, project.id, fresh);
+    for (const row of rows) {
+      const venue = fresh.find((v) => v.platform === row.platform && v.name === row.name);
+      if (!venue) continue;
+      const linkOpts = { appUrl, projectUrl: project.url, platform: row.platform, venueName: row.name };
+      await insertDraftWithCode(
+        supabase,
+        (code) => ({
+          project_id: project.id,
+          venue_id: row.id,
+          language: venue.language,
+          ...trackedDraftFields(venue.draft, code, linkOpts),
+        }),
+        codeSequence(),
+        SHORT_CODE_ATTEMPTS,
+      );
+    }
+    return { suggested: result.venues.length, added: rows.length };
   } catch (err) {
     log.warn("manual venues skipped", { ...ctx, model, error: errorMessage(err) });
     return { suggested: 0, added: 0 };

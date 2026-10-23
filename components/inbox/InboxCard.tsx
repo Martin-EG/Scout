@@ -4,11 +4,14 @@ import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
 import { inputClass } from "@/components/ui/Field";
 import type { InboxItem } from "@/lib/db/inbox";
+import { shortLink } from "@/lib/utm";
 
 type Action = "approve" | "posted" | "reject";
 
 interface InboxCardProps {
   item: InboxItem;
+  /** Origin for /r/<code> tracking links. */
+  appUrl: string;
   act: (draftId: string, body: string, action: Action) => Promise<{ error?: string }>;
 }
 
@@ -19,8 +22,9 @@ const SOURCE_LABELS: Record<string, string> = {
   serpapi: "Google",
 };
 
-export function InboxCard({ item, act }: InboxCardProps) {
+export function InboxCard({ item, appUrl, act }: InboxCardProps) {
   const { draft, lead, venue, cooldown } = item;
+  const trackingLink = draft.short_code ? shortLink(appUrl, draft.short_code) : null;
   const [body, setBody] = useState(draft.body);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -88,6 +92,13 @@ export function InboxCard({ item, act }: InboxCardProps) {
         rows={6}
         className={inputClass}
       />
+
+      {trackingLink && (
+        <p className="text-xs text-zinc-500">
+          Tracking link (counts clicks, adds UTM):{" "}
+          <code className="select-all rounded bg-zinc-100 px-1 py-0.5 dark:bg-zinc-800">{trackingLink}</code>
+        </p>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="secondary" onClick={copy}>

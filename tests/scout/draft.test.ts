@@ -56,17 +56,23 @@ describe("link_policy in the prompt", () => {
     expect(linkPolicyAllowsLinks("allowed on weekends")).toBe(false);
   });
 
-  it("puts the project link in the prompt only when allowed", () => {
-    const allowed = draftPrompt({ project, lead, venue: { name: "r/x", rules: null, link_policy: "allowed" } });
-    expect(allowed).toContain(`include the link ${project.url}`);
-    const unknown = draftPrompt({ project, lead, venue: { name: "r/x", rules: null, link_policy: null } });
-    expect(unknown).not.toContain(project.url.replace(/\/$/, "") + " once");
+  it("puts the tracking link in the prompt only when allowed", () => {
+    const link = "http://localhost:3000/r/AbC1234";
+    const allowed = draftPrompt({ project, lead, link, venue: { name: "r/x", rules: null, link_policy: "allowed" } });
+    expect(allowed).toContain(`include the link ${link}`);
+    const unknown = draftPrompt({ project, lead, link, venue: { name: "r/x", rules: null, link_policy: null } });
+    expect(unknown).not.toContain(link);
     expect(unknown).toContain("happy to share the link");
-    expect(draftPrompt({ project, lead, venue: null })).toContain("Do not include any link");
+    expect(draftPrompt({ project, lead, link, venue: null })).toContain("Do not include any link");
   });
 
   it("includes venue rules when present", () => {
-    const prompt = draftPrompt({ project, lead, venue: { name: "r/x", rules: "No self-promo on weekdays", link_policy: null } });
+    const prompt = draftPrompt({
+      project,
+      lead,
+      link: "http://localhost:3000/r/AbC1234",
+      venue: { name: "r/x", rules: "No self-promo on weekdays", link_policy: null },
+    });
     expect(prompt).toContain("Venue rules: No self-promo on weekdays");
   });
 });

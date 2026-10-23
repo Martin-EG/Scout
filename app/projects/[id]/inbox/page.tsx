@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { z } from "zod";
 import { InboxCard } from "@/components/inbox/InboxCard";
+import { getEnv } from "@/lib/config";
 import { requireUser } from "@/lib/db/auth";
 import { INBOX_TABS, listInbox, type InboxTab } from "@/lib/db/inbox";
 import { getProject } from "@/lib/db/projects";
@@ -40,6 +41,7 @@ async function Inbox({
   if (!project) notFound();
   const tab = tabSchema.parse((await searchParams).tab);
   const items = await listInbox(project.id, tab);
+  const appUrl = getEnv().APP_URL;
 
   return (
     <>
@@ -66,7 +68,7 @@ async function Inbox({
       ) : (
         <ul className="divide-y divide-zinc-200 rounded-md border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
           {items.map((item) => (
-            <InboxCard key={`${item.draft.id}:${item.draft.status}`} item={item} act={draftAction} />
+            <InboxCard key={`${item.draft.id}:${item.draft.status}`} item={item} appUrl={appUrl} act={draftAction} />
           ))}
         </ul>
       )}

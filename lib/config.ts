@@ -26,6 +26,19 @@ export const QUOTAS = {
 
 export const VENUE_COOLDOWN_DAYS = 7;
 
+export const DEFAULT_APP_URL = "http://localhost:3000";
+
+export const LINKS = {
+  shortPathPrefix: "/r/",
+  shortCodeLength: 7,
+  /** Tries before giving up on a unique short code (collisions are rare at 62^7). */
+  shortCodeAttempts: 3,
+  utmMedium: "community",
+  utmCampaign: "scout",
+  /** Max characters kept from the Referer header. */
+  referrerMax: 500,
+} as const;
+
 // ---- Sources ----
 
 /** Sent on every source request. Identifies Scout as a read-only research client. */
@@ -164,7 +177,7 @@ export const PROJECT_LIMITS = {
 } as const;
 
 /** Routes reachable without a session. Everything else redirects to sign-in. */
-export const PUBLIC_PATHS = ["/sign-in", "/auth/confirm"] as const;
+export const PUBLIC_PATHS = ["/sign-in", "/auth/confirm", "/r"] as const;
 export const SIGN_IN_PATH = "/sign-in";
 export const HOME_PATH = "/projects";
 
@@ -179,6 +192,8 @@ const serverEnvSchema = z.object({
   SCORER_MODEL: z.string().min(1).default(DEFAULT_SCORER_MODEL),
   DRAFTER_MODEL: z.string().min(1).default(DEFAULT_DRAFTER_MODEL),
   SEARXNG_URL: z.url().default(DEFAULT_SEARXNG_URL),
+  /** Public origin of this app, used to build /r/<code> tracking links in drafts. */
+  APP_URL: z.url().default(DEFAULT_APP_URL),
   /** Required only when the SerpApi source runs. */
   SERPAPI_KEY: z.string().min(1).optional(),
 });
@@ -212,6 +227,7 @@ export function getEnv(): ServerEnv {
     SCORER_MODEL: readVar("SCORER_MODEL"),
     DRAFTER_MODEL: readVar("DRAFTER_MODEL"),
     SEARXNG_URL: readVar("SEARXNG_URL"),
+    APP_URL: readVar("APP_URL"),
     SERPAPI_KEY: readVar("SERPAPI_KEY"),
   });
   if (!parsed.success) {

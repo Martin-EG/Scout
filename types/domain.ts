@@ -63,6 +63,8 @@ export type Draft = {
   language: string;
   status: DraftStatus;
   utm_url: string | null;
+  /** Code for the /r/<code> tracking link. */
+  short_code: string | null;
   posted_at: string | null;
   created_at: string;
 };

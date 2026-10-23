@@ -16,11 +16,13 @@ export interface DraftPromptInput {
   project: Project;
   lead: Pick<Lead, "title" | "snippet" | "url">;
   venue: Pick<Venue, "name" | "rules" | "link_policy"> | null;
+  /** Tracking link (/r/<code>) to use instead of the bare project URL. */
+  link: string;
 }
 
-export function draftPrompt({ project, lead, venue }: DraftPromptInput): string {
+export function draftPrompt({ project, lead, venue, link }: DraftPromptInput): string {
   const linkRule = linkPolicyAllowsLinks(venue?.link_policy)
-    ? `You may include the link ${project.url} once, at the end.`
+    ? `You may include the link ${link} once, at the end.`
     : 'Do not include any link. If it fits, say "happy to share the link" instead.';
   return `App profile:
 ${formatProjectProfile(project)}

@@ -22,6 +22,8 @@ export interface ScoutDeps {
   llm: LLMProvider;
   sources: Sources;
   models: { planner: string; scorer: string; drafter: string };
+  /** Public app origin for /r/<code> tracking links. */
+  appUrl: string;
   now?: () => number;
 }
 
@@ -93,12 +95,12 @@ export async function runScout(project: Project, runId: string, deps: ScoutDeps)
     const drafts = await step("draft", async () => {
       const candidates = await listLeadsToDraft(deps.supabase, project.id, DRAFTS.candidatesPerRun);
       const leads = selectLeadsToDraft(candidates, now());
-      return draftLeads(deps.llm, deps.models.drafter, deps.supabase, project, leads, ctx);
+      return draftLeads(deps.llm, deps.models.drafter, deps.supabase, project, leads, deps.appUrl, ctx);
     });
     log.info("drafted", { ...ctx, ...drafts });
 
     const venues = await step("venues", () =>
-      suggestManualVenues(deps.llm, deps.models.drafter, deps.supabase, project, ctx),
+      suggestManualVenues(deps.llm, deps.models.drafter, deps.supabase, project, deps.appUrl, ctx),
     );
     log.info("manual venues", { ...ctx, ...venues });
 

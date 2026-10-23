@@ -1,12 +1,19 @@
 import { DRAFTS, SCOUT } from "@/lib/config";
-import { saveLeadDraft, type LeadToDraft, type ServiceSupabase } from "@/lib/db/scoutStore";
+import {
+  insertDraftWithCode,
+  markLeadDrafted,
+  type LeadToDraft,
+  type ServiceSupabase,
+} from "@/lib/db/scoutStore";
 import type { LLMProvider } from "@/lib/llm";
 import { DRAFT_SYSTEM, draftPrompt } from "@/lib/llm/prompts/draft";
 import { draftSchema } from "@/lib/llm/schemas/draft";
 import type { Hit, HitSource, Project } from "@/types/domain";
+import { generateShortCode, shortLink } from "@/lib/utm";
 import { normalizeText } from "./keywords";
 import { errorMessage, log, type LogContext } from "./log";
 import { estimateRedditDates } from "./redditAge";
+import { codeSequence, SHORT_CODE_ATTEMPTS, trackedDraftFields } from "./trackedLink";
 import { isTooOld } from "./rules";
 
 export function wordCount(text: string): number {
@@ -67,24 +74,41 @@ export async function draftLeads(
   supabase: ServiceSupabase,
   project: Project,
   leads: LeadToDraft[],
+  appUrl: string,
   ctx: LogContext,
 ): Promise<{ drafted: number; failed: number }> {
   let drafted = 0;
   let failed = 0;
   for (const lead of leads) {
     try {
-      const draft = await llm.completeJSON(draftPrompt({ project, lead, venue: lead.venue }), checkedDraftSchema, {
-        model,
-        system: DRAFT_SYSTEM,
-        temperature: DRAFTS.temperature,
-      });
-      await saveLeadDraft(supabase, {
-        project_id: project.id,
-        lead_id: lead.id,
-        venue_id: lead.venue?.id ?? null,
-        body: draft.body,
-        language: draft.language,
-      });
+      // The prompt shows the first code's link; the insert uses that code unless it collides.
+      const firstCode = generateShortCode();
+      const promptLink = shortLink(appUrl, firstCode);
+      const draft = await llm.completeJSON(
+        draftPrompt({ project, lead, venue: lead.venue, link: promptLink }),
+        checkedDraftSchema,
+        { model, system: DRAFT_SYSTEM, temperature: DRAFTS.temperature },
+      );
+      const linkOpts = {
+        appUrl,
+        projectUrl: project.url,
+        platform: lead.venue?.platform ?? "web",
+        venueName: lead.venue?.name ?? "web",
+        promptLink,
+      };
+      await insertDraftWithCode(
+        supabase,
+        (code) => ({
+          project_id: project.id,
+          lead_id: lead.id,
+          venue_id: lead.venue?.id ?? null,
+          language: draft.language,
+          ...trackedDraftFields(draft.body, code, linkOpts),
+        }),
+        codeSequence(firstCode),
+        SHORT_CODE_ATTEMPTS,
+      );
+      await markLeadDrafted(supabase, lead.id);
       drafted++;
     } catch (err) {
       failed++;
