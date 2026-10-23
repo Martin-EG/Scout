@@ -9,7 +9,7 @@ interface ScorePromptOptions {
 }
 
 function formatHit(hit: Hit, index: number, snippetChars: number): string {
-  const posted = hit.postedAt ? hit.postedAt.slice(0, 10) : "unknown";
+  const posted = hit.postedAt ? `${hit.postedAtEstimated ? "about " : ""}${hit.postedAt.slice(0, 10)}` : "unknown";
   const text = hit.snippet.replace(/\s+/g, " ").trim().slice(0, snippetChars);
   return `[${index + 1}] url: ${hit.url}
 where: ${hit.venueName} | posted: ${posted}

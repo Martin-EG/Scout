@@ -103,6 +103,8 @@ export type Hit = {
   author?: string;
   /** ISO 8601. Missing when the source gives no date (common for web results). */
   postedAt?: string;
+  /** True when postedAt was estimated (Reddit id), not given by the source. Not stored. */
+  postedAtEstimated?: boolean;
   /** Where the conversation lives: "r/MakeupAddiction", "Hacker News", "example.com". */
   venueName: string;
   venueUrl: string;

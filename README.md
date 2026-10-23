@@ -42,6 +42,9 @@ What works today:
    - **dedupe**: URLs normalized (tracking params, fragments, trailing slashes, reddit
      hosts) and dropped if already a lead for the project (dismissed ones included).
      App-store listings and the project's own site are dropped; hits older than 30 days too.
+     Undated Reddit threads get an estimated date from their base-36 post id (a line fit
+     through the run's dated Reddit posts), so years-old threads from web search fail
+     the 30-day rule. The estimate is only used for filtering; leads store real dates.
      Keyword gate: a hit must contain one of the project's keyword phrases, or two distinct
      keyword words, in its title or snippet (so project keywords now matter).
    - **score**: `SCORER_MODEL` (default gemma3:4b; gemma3:12b recommended, see Dev log)
@@ -248,10 +251,23 @@ A/B: the same 42 stored leads (runs 2 and 3) rescored by both models:
 - Both models labeled every one of the 42 as `author_type: person`, blogs included:
   the field filters nothing yet; the intent score does the work.
 
+Reddit thread dates (`lib/scout/redditAge.ts`): undated Reddit thread hits get
+`postedAt` from a least-squares line through the run's dated Reddit-source posts
+(fallback: two anchors in `SCOUT.redditIdAnchors`), flagged `postedAtEstimated`; the
+scorer sees "about <date>"; `keepLeads` stores null for estimated dates. Check on real
+ids: a held-out post is estimated within a day; `q7p0v6` (Oct 2021) -> Sept 2021. On
+run 3's 12 undated Reddit leads it drops 9 (estimated 2019-2026-09) and keeps 3 recent ones.
+Tests: 62 passing.
+
+Run 4 (GlamVault, gemma3:12b scorer, date fix): 255 hits, 220 unique (run 3's leads
+deduped out), 46 on topic, 42 scored, 7 leads. plan 48 s, search 4 m 09 s, score
+4 m 49 s, total 9 m 48 s. No old Reddit threads (one estimated 2026-10-17 kept). The 7
+are weaker than run 3's: run 3 already took the good recent threads one day earlier, and
+4 of 7 are undated TikTok / Instagram / YouTube posts.
+
 Known issues:
-- Undated web results bypass the 30-day rule. In run 3, SearXNG/SerpApi returned Reddit
-  threads from 2018-2023 without dates, and they rank at the top. Fix next: estimate a
-  Reddit post's date from its base-36 id, calibrated on dated Reddit hits in the run.
+- Undated non-Reddit results (TikTok, Instagram, YouTube, blogs) still bypass the
+  30-day rule and are mostly creators, not people asking for help.
 - The default scorer is still gemma3:4b (CLAUDE.md: small model for scoring). 12b is
   clearly better at rejecting off-topic posts but makes runs about 4 minutes longer.
 - Leads stored before the `tl` fix keep their duplicates.

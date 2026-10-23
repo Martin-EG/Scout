@@ -35,7 +35,8 @@ export async function keepLeads(
     url: hit.url,
     title: hit.title,
     snippet: hit.snippet.slice(0, SCOUT.leadSnippetChars) || null,
-    posted_at: hit.postedAt ?? null,
+    // Estimated dates only gate the age rule; the stored date stays a real one.
+    posted_at: hit.postedAtEstimated ? null : (hit.postedAt ?? null),
     relevance_score: hit.relevance,
     intent_score: hit.intent,
     reason: hit.reason || null,

@@ -94,6 +94,15 @@ export const SCOUT = {
   plannerTimeoutMs: 300_000,
   scorerTemperature: 0.1,
   /**
+   * Reddit post ids are base-36 and increase with time. Undated Reddit hits get a date
+   * from a line fit through the run's dated Reddit posts; these anchors (observed
+   * 2026-10) are used when the run has fewer than two.
+   */
+  redditIdAnchors: [
+    { id: "1woxq6e", postedAt: "2026-09-24T10:12:16Z" },
+    { id: "1xc691n", postedAt: "2026-10-22T02:10:40Z" },
+  ],
+  /**
    * Keyword pre-filter: a hit must contain one of the project's keyword phrases, or at
    * least this many distinct keyword words, before it reaches the scorer.
    */
