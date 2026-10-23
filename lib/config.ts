@@ -109,6 +109,13 @@ export const SCOUT = {
   minKeywordTokenOverlap: 2,
   /** Listing pages, never conversations: dropped before scoring (the project's own domain is too). */
   skipDomains: ["apps.apple.com", "play.google.com", "chromewebstore.google.com", "producthunt.com"],
+  /**
+   * Video and social sites whose search results come without dates and are mostly
+   * creators, not people asking for help: undated hits from them are dropped.
+   */
+  undatedSocialDomains: ["tiktok.com", "instagram.com", "youtube.com", "youtu.be"],
+  /** Facebook paths that are videos or reels (group posts stay). */
+  facebookVideoPath: /\/(videos|reel|watch)\b/,
 } as const;
 
 export const WORKER = {

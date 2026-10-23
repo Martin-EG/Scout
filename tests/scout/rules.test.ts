@@ -3,6 +3,7 @@ import {
   applyScoreRules,
   isSkippedDomain,
   isTooOld,
+  isUndatedSocialVideo,
   passesScoreRules,
   selectHitsToScore,
   type ScoredHit,
@@ -126,5 +127,32 @@ describe("isSkippedDomain", () => {
   it("keeps conversations", () => {
     expect(isSkippedDomain({ url: "https://www.reddit.com/r/MakeupRehab/comments/1/x" }, project)).toBe(false);
     expect(isSkippedDomain({ url: "https://notapps.apple.com.example/x" }, project)).toBe(false);
+  });
+});
+
+describe("isUndatedSocialVideo", () => {
+  it("drops undated TikTok, Instagram, YouTube, and Facebook videos/reels", () => {
+    for (const url of [
+      "https://www.tiktok.com/@x/video/1",
+      "https://www.instagram.com/reel/Dd6oN6jBWjJ",
+      "https://www.youtube.com/watch?v=abc",
+      "https://m.youtube.com/watch?v=abc",
+      "https://youtu.be/abc",
+      "https://www.facebook.com/100092386157692/videos/slug/29815659161355704",
+      "https://www.facebook.com/reel/123",
+    ]) {
+      expect(isUndatedSocialVideo({ url }), url).toBe(true);
+    }
+  });
+
+  it("keeps dated ones, Facebook group posts, and other sites", () => {
+    expect(isUndatedSocialVideo({ url: "https://www.youtube.com/watch?v=abc", postedAt: "2026-10-20T00:00:00Z" })).toBe(
+      false,
+    );
+    expect(isUndatedSocialVideo({ url: "https://www.facebook.com/groups/7455827464472754/posts/28779663941662464" })).toBe(
+      false,
+    );
+    expect(isUndatedSocialVideo({ url: "https://www.reddit.com/r/x/comments/1/t" })).toBe(false);
+    expect(isUndatedSocialVideo({ url: "https://notyoutube.com/watch" })).toBe(false);
   });
 });

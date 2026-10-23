@@ -9,7 +9,7 @@ import { buildKeywordIndex, matchesKeywords } from "@/lib/scout/keywords";
 import { errorMessage, log, type LogContext } from "@/lib/scout/log";
 import { planQueries } from "@/lib/scout/planQueries";
 import { estimateRedditDates } from "@/lib/scout/redditAge";
-import { applyScoreRules, isSkippedDomain, selectHitsToScore } from "@/lib/scout/rules";
+import { applyScoreRules, isSkippedDomain, isUndatedSocialVideo, selectHitsToScore } from "@/lib/scout/rules";
 import { scoreHits } from "@/lib/scout/score";
 import { searchAll } from "@/lib/scout/search";
 import type { Project, RunStep, StepDurations } from "@/types/domain";
@@ -68,7 +68,9 @@ export async function runScout(project: Project, runId: string, deps: ScoutDeps)
     const existing = new Set((await getLeadUrls(deps.supabase, project.id)).map(normalizeUrl));
     const fresh = estimateRedditDates(dedupeHits(search.hits, existing));
     const keywords = buildKeywordIndex(project);
-    const candidates = fresh.filter((hit) => !isSkippedDomain(hit, project.url) && matchesKeywords(hit, keywords));
+    const candidates = fresh.filter(
+      (hit) => !isSkippedDomain(hit, project.url) && !isUndatedSocialVideo(hit) && matchesKeywords(hit, keywords),
+    );
     const toScore = selectHitsToScore(candidates, now());
     log.info("searched", {
       ...ctx,

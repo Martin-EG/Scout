@@ -69,6 +69,16 @@ export function isSkippedDomain(
   return host === own || skipDomains.some((d) => host === d || host.endsWith(`.${d}`));
 }
 
+/** Undated hit from TikTok, Instagram, YouTube, or a Facebook video/reel. */
+export function isUndatedSocialVideo(hit: Pick<Hit, "url" | "postedAt">): boolean {
+  if (hit.postedAt) return false;
+  const host = hostOf(hit.url);
+  if (!host) return false;
+  const matches = (domain: string) => host === domain || host.endsWith(`.${domain}`);
+  if (SCOUT.undatedSocialDomains.some(matches)) return true;
+  return matches("facebook.com") && SCOUT.facebookVideoPath.test(new URL(hit.url).pathname);
+}
+
 /**
  * Before scoring: drop hits already too old, then cap the batch, newest first
  * (undated hits after dated ones), so the scorer's time goes to fresh threads.
